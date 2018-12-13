@@ -4,70 +4,27 @@
 
 #include <omp.h>
 
-template <class AC>
+template <class AC, typename GETCOST>
 class DirectCost
 {
 private:
 	int target_size;
-	int total_channel;
-	float *own_target;
-	float *own_source;
+	GETCOST getcost;
 
 	std::vector<AC> *p_beta;
 	std::vector<AC> *p_alpha;
 
-	int device_count;
-
 public:
-	DirectCost(float *linear_target, int target_size, float *linear_source, int source_size, int total_channel)
-		: target_size(target_size), total_channel(total_channel)
+	DirectCost(GETCOST &getcost, int target_size)
+		: target_size(target_size), getcost(getcost)
 	{
-		own_target = new float[target_size * total_channel];
-		own_source = new float[target_size * total_channel];
-#pragma omp parallel for
-		for (int x = 0; x < target_size; x++)
-		{
-			//sorted[x] = x;
-			int x0 = src_idx(x, source_size, target_size);
-			for (int cc = 0; cc < total_channel; cc++)
-			{
-				own_source[x * total_channel + cc] = linear_source[cc * source_size + x0];
-				own_target[x * total_channel + cc] = linear_target[cc * target_size + x];
-			}
-		}
-	}
-
-	float update_target(float *linear_target, int x)
-	{
-		float mod = 0.0f;
-		for (int cc = 0; cc < total_channel; cc++)
-		{
-			float d = own_target[x * total_channel + cc] - linear_target[cc * target_size + x];
-			mod += d * d;
-			own_target[x * total_channel + cc] = linear_target[cc * target_size + x];
-		}
-		return mod / (float)total_channel;
 	}
 
 	~DirectCost()
 	{
-		delete[] own_target;
-		delete[] own_source;
 	}
 
-	const AC getCost(int x, int y) const
-	{
-		AC cost = AC(0.0);
-		int sidx = y * total_channel;
-		int tidx = x * total_channel;
-		for (int cc = 0; cc < total_channel; cc++)
-		{
-			AC d = own_source[sidx++] - own_target[tidx++];
-			cost = cost + d * d;
-		}
-		cost /= (AC)total_channel;
-		return cost;
-	}
+	const AC getCost(int x, int y) const { return getcost(x, y); }
 
 	template <bool PAR, class C>
 	void iterate(const C &c, int x, AC &limit, std::vector<AC> &beta)

@@ -93,13 +93,15 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 
 			int *rowsol = new int[N];
 
+			C eps = C(0);
+
 			if (omp)
 			{
 #ifdef LAP_OPENMP
 				lap::omp::Worksharing ws(N, 8);
 				lap::omp::TableCost<C> costMatrix(N, N, tab, ws);
 				lap::omp::DirectIterator<C, C, lap::omp::TableCost<C>> iterator(N, N, costMatrix, ws);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator) / C(1000.0));
+				if (epsilon) costMatrix.setInitialEpsilon(eps = (lap::omp::guessEpsilon<C>(N, N, iterator) / C(1000.0)));
 
 				lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -116,7 +118,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 			{
 				lap::TableCost<C> costMatrix(N, N, tab);
 				lap::DirectIterator<C, C, lap::TableCost<C>> iterator(N, N, costMatrix);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator) / C(1000.0));
+				if (epsilon) costMatrix.setInitialEpsilon(eps = (lap::guessEpsilon<C>(N, N, iterator) / C(1000.0)));
 
 				lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -127,6 +129,11 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 					ss << "cost = " << lap::cost<C, C>(N, costMatrix, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
+			}
+
+			// run auction solver with table
+			{
+				auctionAlgorithm<C>(rowsol, [&](int x, int y) { return tab[y + x * N]; }, N, eps, true);
 			}
 
 			delete[] rowsol;

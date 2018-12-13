@@ -144,7 +144,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\auction\auction_cpu.cpp" />
     <ClCompile Include="..\..\test\test_cpu.cpp" />
   </ItemGroup>
   <ItemGroup>

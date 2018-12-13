@@ -2,12 +2,6 @@
 
 #include <vector>
 
-typedef float AuctionCost;
-
-AuctionCost getCurrentCost(int *linear_index, float *linear_target, int target_size, float *linear_source, int source_size, int total_channel);
-void auctionAlgorithm(int *linear_index, float *linear_target, int target_size, float *linear_source, int source_size, int total_channel, std::vector<AuctionCost> &beta, bool relaxed);
-void auctionAlgorithmCleanup();
-
 #include <thread>
 #include <mutex>
 #include <chrono>
@@ -23,6 +17,8 @@ void auctionAlgorithmCleanup();
 #include "auction_find_caching.h"
 
 #include "auction_one_way.h"
+
+#include "../../lap_solver/core/lap_solver.h"
 
 #include <omp.h>
 
@@ -52,9 +48,9 @@ void auctionAlgorithmCleanup();
 //static float epsilon_step[8] = { 1.0f, 0.1f, 0.01f, 0.001f, 0.0001f, 0.00001f, 0.000001f, 0.0f };
 //static float fraction_unmatched[8] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
-const int epsilon_steps = 11;
-static float epsilon_step[11] = { 100.0f, 10.0f, 1.0f, 0.1f, 0.01f, 0.001f, 0.0001f, 0.00001f, 0.000001f, 0.0000001f, 0.0f };
-static float fraction_unmatched[11] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+//const int epsilon_steps = 11;
+//static float epsilon_step[11] = { 1.0f, 0.1f, 0.01f, 0.001f, 0.0001f, 0.00001f, 0.000001f, 0.0000001f, 0.00000001f, 0.000000001f, 0.0f };
+//static float fraction_unmatched[11] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
 #define CACHE1 127
 #define CACHE2 4095
@@ -78,13 +74,13 @@ static int full_runs = 3;
 
 auto global_l = []() { return -1.0f; };
 
-template <class COST, class FIND, class L = decltype(global_l)>
-void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AuctionCost> &beta, bool exact = false, int initial_epsilon = 0, L l = global_l)
+template <class AC, class COST, class FIND, class L = decltype(global_l)>
+void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AC> &beta, AC initial_epsilon, L l = global_l)
 {
 	auto start_time = std::chrono::high_resolution_clock::now();
 
 	int target_size = (int)coupling.size();
-	std::vector<std::pair<volatile int, volatile AuctionCost>> B(target_size);
+	std::vector<std::pair<volatile int, volatile AC>> B(target_size);
 	std::vector<std::vector<int>> unassigned(2);
 	unassigned[0].resize(target_size);
 	unassigned[1].resize(target_size);
@@ -100,10 +96,7 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<Auc
 	int d_count = 0;
 #endif
 
-	//AuctionCost epsilon = initial_epsilon;
-	int epsilon_idx = initial_epsilon;
-	//if (exact) epsilon = 0.0f;
-	if (exact) epsilon_idx = epsilon_steps - 1;
+	AC epsilon = initial_epsilon;
 
 	int completed = 0;
 
@@ -114,28 +107,6 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<Auc
 		B[y].second = MAX_COST;
 	}
 
-#ifdef REUSE_BETA
-	if (beta.size() == 0)
-	{
-		beta.resize(target_size);
-#pragma omp parallel for
-		for (int y = 0; y < target_size; y++)
-		{
-			beta[y] = AuctionCost(0.0);
-		}
-		c.updateBeta(beta, target_size);
-		full_runs--;
-	}
-	else if (full_runs == 0)
-	{
-		//epsilon = INITIAL_EPSILON * (EPSILON_SCALE * EPSILON_SCALE * EPSILON_SCALE);
-		epsilon_idx = epsilon_steps >> 2;
-	}
-	else
-	{
-		full_runs--;
-	}
-#else
 	if (beta.size() == 0)
 	{
 		beta.resize(target_size);
@@ -143,28 +114,47 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<Auc
 #pragma omp parallel for
 	for (int y = 0; y < target_size; y++)
 	{
-		beta[y] = AuctionCost(0.0);
+		beta[y] = AC(0);
 	}
 	c.updateBeta(beta, target_size);
-#endif
 
 	std::vector<std::mutex> Block(B.size());
 	// loop until done
 
 	int elapsed = 0;
-	//AuctionCost old_epsilon = epsilon * AuctionCost(2.0) + AuctionCost(1.0);
-	AuctionCost old_epsilon = epsilon_step[epsilon_idx] * AuctionCost(2.0) + AuctionCost(1.0);
+	AC old_epsilon = epsilon * AC(2) + AC(1);
+	AC epsilon_lower = epsilon / AC(target_size);
 	int iteration = 0;
 
-	AuctionOneWay<AuctionCost> auction;
+	AuctionOneWay<AC> auction;
 
-	while (epsilon_idx < epsilon_steps)
+	bool first = true;
+
+	AC max_beta(0);
+
+	while (epsilon >= AC(0))
 	{
-		AuctionCost epsilon = epsilon_step[epsilon_idx];
-		int incomplete_allowed = (int)floor(target_size * fraction_unmatched[epsilon_idx]);
-		epsilon_idx++;
-		//f.updateAll(c, beta);
 		completed = 0;
+
+		if (epsilon > AC(0))
+		{
+			if (!first)
+			{
+#if 0
+				if (max_beta == AC(0))
+				{
+					epsilon *= AC(0.5);
+				}
+				else epsilon = std::max(AC(0), AC(0.5) * (epsilon + max_beta / AC(target_size)));
+				if (epsilon < epsilon_lower) epsilon = AC(0);
+#else
+				epsilon *= AC(0.2);
+				if (epsilon < epsilon_lower) epsilon = AC(0);
+#endif
+			}
+		}
+		first = false;
+
 		// initialize coupling
 		for (int i = 0; i < target_size; i++)
 		{
@@ -173,9 +163,13 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<Auc
 		}
 		u_count[0] = target_size;
 
-		while (completed + incomplete_allowed < target_size)
+		while (completed < target_size)
 		{
-			displayProgress(start_time, elapsed, completed, target_size, iteration, epsilon, old_epsilon);
+#ifndef LAP_QUIET
+			std::stringstream ss;
+			ss << " eps = " << epsilon;
+			lap::displayProgress(start_time, elapsed, completed, target_size, ss.str().c_str(), iteration);
+#endif
 			iteration++;
 
 			bool update = true;// ((((iteration ^ (iteration - 1)) + 1) >> 1) == iteration);
@@ -199,246 +193,60 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<Auc
 #endif
 			}
 
-			if (completed + incomplete_allowed >= target_size)
+#ifdef LAP_QUIET
+			if ((completed == target_size) && (epsilon == AC(0)))
+#else
+			if (completed == target_size)
+#endif
 			{
-				if (completed == target_size)
-				{
-					float cost = l();
-					if (cost >= 0.0f) displayProgressCost(start_time, elapsed, completed, target_size, iteration, epsilon, cost);
-					else displayProgress(start_time, elapsed, completed, target_size, iteration, epsilon, old_epsilon, true);
-				}
-				else
-				{
-					displayProgress(start_time, elapsed, completed, target_size, iteration, epsilon, old_epsilon, true);
-				}
+				AC cost = l();
+				std::stringstream ss;
+#ifndef LAP_QUIET
+				ss << " epsilon = " << epsilon;
+#endif
+				if (cost > AC(0)) ss << " cost = " << cost;
+#ifdef LAP_QUIET
+				lap::displayTime(start_time, ss.str().c_str(), std::cout);
+#else
+				lap::displayProgress(start_time, elapsed, completed, target_size, ss.str().c_str(), iteration);
+#endif
 			}
 		}
-		// find maximum beta (for stability)
-		AuctionCost max_beta = beta[0];
-		for (int y = 1; y < target_size; y++) max_beta = std::max(max_beta, beta[y]);
-		for (int y = 0; y < target_size; y++) beta[y] -= max_beta;
-		f.fixBeta(max_beta);
-		c.updateBeta(beta, target_size);
+
+		// check for epsilon == 0 and ensure termination
+		if (epsilon == AC(0)) epsilon = AC(-1);
+		else
+		{
+			// find maximum beta (for stability)
+			max_beta = beta[0];
+			for (int y = 1; y < target_size; y++) max_beta = std::max(max_beta, beta[y]);
+			for (int y = 0; y < target_size; y++) beta[y] -= max_beta;
+			f.fixBeta(max_beta);
+			c.updateBeta(beta, target_size);
+		}
 	}
 }
 
-template <class COST, class FIND>
-void assignSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AuctionCost> &beta)
-{
-	//auto start_time = std::chrono::high_resolution_clock::now();
-
-	int target_size = (int)coupling.size();
-	std::vector<std::vector<int>> unassigned(2);
-	unassigned[0].resize(target_size);
-	unassigned[1].resize(target_size);
-
-	std::vector<int> u_count(2);
-	u_count[0] = u_count[1] = 0;
-
-#ifdef DEFER_MISS
-	std::vector<int> deferred(target_size);
-	int d_count = 0;
-#endif
-
-	int completed = 0;
-
-#ifdef REUSE_BETA
-	if (beta.size() == 0)
-	{
-		beta.resize(target_size);
-#pragma omp parallel for
-		for (int y = 0; y < target_size; y++)
-		{
-			beta[y] = AuctionCost(0.0);
-		}
-		c.updateBeta(beta, target_size);
-	}
-#else
-	if (beta.size() == 0)
-	{
-		beta.resize(target_size);
-	}
-#pragma omp parallel for
-	for (int y = 0; y < target_size; y++)
-	{
-		beta[y] = AuctionCost(0.0);
-	}
-	c.updateBeta(beta, target_size);
-#endif
-
-	//int elapsed = 0;
-
-	AuctionOneWay<AuctionCost> auction;
-
-	{
-		// initialize coupling
-		for (int i = 0; i < target_size; i++)
-		{
-			coupling[i] = -1;
-			unassigned[0][i] = i;
-		}
-		u_count[0] = target_size;
-
-		{
-			bool update = true;// ((((iteration ^ (iteration - 1)) + 1) >> 1) == iteration);
-
-							   //int old_completed = completed;
-
-#ifdef DEFER_MISS
-			completed = auction.assign(coupling, beta, c, f, u_count, unassigned, d_count, deferred, target_size, update);
-#else
-			completed = auction.assign(coupling, beta, c, f, u_count, unassigned, target_size, update);
-#endif
-		}
-#if 1
-		// find maximum beta (for stability)
-		AuctionCost max_beta = beta[0];
-		for (int y = 1; y < target_size; y++) max_beta = std::max(max_beta, beta[y]);
-		for (int y = 0; y < target_size; y++) beta[y] -= max_beta;
-		f.fixBeta(max_beta);
-		c.updateBeta(beta, target_size);
-#endif
-	}
-}
-
-template <class COST, class FIND>
-void auctionMultiple(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AuctionCost> &beta, AuctionCost initial_epsilon, AuctionCost min_epsilon)
-{
-	auto start_time = std::chrono::high_resolution_clock::now();
-
-	std::vector<std::pair<volatile int, volatile AuctionCost>> B(c.getRealTargetSize());
-
-	std::vector<std::vector<int>> unassigned(2);
-	unassigned[0].resize(c.getSourceSize());
-	unassigned[1].resize(c.getSourceSize());
-	std::vector<std::vector<int>> unassigned_count(2);
-	unassigned_count[0].resize(c.getSourceSize());
-	unassigned_count[1].resize(c.getSourceSize());
-	std::vector<int> receiving(c.getRealTargetSize());
-
-	int r_count;
-	std::vector<int> u_count(2);
-
-	AuctionCost epsilon = initial_epsilon;
-
-	int completed = 0;
-
-	std::vector<std::mutex> Block(B.size());
-	// loop until done
-
-	int elapsed = 0;
-	AuctionCost old_epsilon = epsilon * AuctionCost(2.0);
-	int iteration = 0;
-
-	AuctionOneWay<AuctionCost> auction;
-
-	// force correct solution
-	//epsilon = min_epsilon;
-
-	int epsilon_idx = 0;
-
-	while (epsilon_idx + 1 < epsilon_steps)
-	{
-		epsilon = epsilon_step[epsilon_idx++];
-		u_count[0] = u_count[1] = 0;
-		//		u_count = 0;
-		r_count = 0;
-
-#pragma omp parallel for
-		for (int y = 0; y < c.getRealTargetSize(); y++)
-		{
-			beta[y] = AuctionCost(0.0);
-			B[y].first = -1;
-			B[y].second = MAX_COST;
-		}
-
-		//f.updateAll(c, beta);
-		completed = 0;
-		// initialize coupling
-		for (int i = 0; i < c.getSourceSize(); i++)
-		{
-#if 1
-			unassigned[0][i] = i;
-			unassigned_count[0][i] = c.getSourceCount(i);
-			unassigned_count[1][i] = 0;
-#else
-			unassigned[i] = i;
-			unassigned_count[i] = c.getSourceCount(i);
-#endif
-		}
-		for (int i = 0; i < c.getRealTargetSize(); i++)
-		{
-			coupling[i] = -1;
-		}
-		u_count[0] = c.getSourceSize();
-		//		u_count = c.getSourceSize();
-
-		while (completed < c.getRealTargetSize())
-		{
-			displayProgress(start_time, elapsed, completed, c.getRealTargetSize(), iteration, epsilon, old_epsilon);
-			iteration++;
-
-			completed = auction.auctionMultiple(coupling, beta, c, f, u_count, unassigned, unassigned_count, r_count, receiving, B, Block, epsilon);
-
-			if (completed == c.getRealTargetSize()) displayProgress(start_time, elapsed, completed, c.getRealTargetSize(), iteration, epsilon, old_epsilon, true);
-		}
-#if 1
-		// find maximum beta (for stability)
-		AuctionCost max_beta = beta[0];
-		for (int y = 1; y < c.getRealTargetSize(); y++) max_beta = std::max(max_beta, beta[y]);
-		for (int y = 0; y < c.getRealTargetSize(); y++) beta[y] -= max_beta;
-		f.fixBeta(max_beta);
-#endif
-
-		//epsilon *= EPSILON_SCALE;
-		//if (epsilon <= 0.99f * min_epsilon) epsilon = -1.0f;
-		//		if (epsilon <= 1.01f * MIN_EPSILON) epsilon = -1.0f;
-		//		else epsilon *= EPSILON_SCALE;
-	}
-}
-
-DirectCost<AuctionCost> *g_c = NULL;
-FindCaching<DirectCost<AuctionCost>, CACHE2, AuctionCost> *g_f = NULL;
-
-void auctionAlgorithmCleanup()
-{
-	if (g_c != NULL)
-	{
-		delete g_c;
-		g_c = NULL;
-	}
-	if (g_f != NULL)
-	{
-		delete g_f;
-		g_f = NULL;
-	}
-}
-
-void auctionAlgorithm(int *linear_index, float *linear_target, int target_size, float *linear_source, int source_size, int total_channel, std::vector<AuctionCost> &beta, bool relaxed)
+template <class AC, class GETCOST>
+void auctionAlgorithm(int *linear_index, GETCOST &getcost, int target_size, AC initial_epsilon, bool table)
 {
 	processor_count = omp_get_num_procs();
 	omp_set_num_threads(processor_count);
 
-	std::cout << "maximum number of threads: " << omp_get_max_threads() << std::endl;
+	std::cout << "Auction solver using " << omp_get_max_threads() << " threads." << std::endl;
 
-#ifndef REUSE_BETA
-#pragma omp parallel for
-	for (int x = 0; x < beta.size(); x++) beta[x] = AuctionCost(0.0);
-#endif
+	std::vector<AC> beta;
 
 	auto start_time = std::chrono::high_resolution_clock::now();
 	// non-reduced
 	std::vector<int> coupling(target_size);
 
-	if (target_size <= 1024)
+	if (table)
 	{
-		TableCost<AuctionCost> c(linear_target, target_size, linear_source, source_size, total_channel);
-		FindLinear<TableCost<AuctionCost>, AuctionCost> f(target_size);
-		displayTime(start_time, "setup completed");
-		if (relaxed)
-			assignSingle(coupling, c, f, beta);
-		else
-			auctionSingle(coupling, c, f, beta, false, 0, [&]()
+		TableCost<AC> c(getcost, target_size);
+		FindLinear<TableCost<AC>, AC> f(target_size);
+		lap::displayTime(start_time, "setup completed", std::cout);
+		auctionSingle(coupling, c, f, beta, initial_epsilon, [&]()
 		{
 #pragma omp parallel for
 			for (int x = 0; x < target_size; x++)
@@ -446,36 +254,16 @@ void auctionAlgorithm(int *linear_index, float *linear_target, int target_size, 
 				// slack...
 				if (coupling[x] != -1) linear_index[coupling[x]] = x;
 			}
-			float cost = getCurrentCost(linear_index, linear_target, target_size, linear_source, source_size, total_channel) * total_channel;
+			AC cost = getCurrentCost<AC, GETCOST>(linear_index, getcost, target_size);
 			return cost;
 		});
 	}
 	else
 	{
-		if (g_c == NULL)
-		{
-			g_c = new DirectCost<AuctionCost>(linear_target, target_size, linear_source, source_size, total_channel);
-			g_f = new FindCaching<DirectCost<AuctionCost>, CACHE2, AuctionCost>(target_size, *g_c, beta);
-		}
-		else
-		{
-#ifdef REUSE_CACHE
-			g_c->updateBeta(beta, target_size);
-			g_f->recreate(*g_c, linear_target);
-#else
-			delete g_f;
-			delete g_c;
-			g_c = new DirectCost<AuctionCost>(linear_target, target_size, linear_source, source_size, total_channel);
-			g_f = new FindCaching<DirectCost<AuctionCost>, CACHE2, AuctionCost>(target_size, *g_c, beta);
-#endif
-		}
-		DirectCost<AuctionCost> &c = *g_c;
-		FindCaching<DirectCost<AuctionCost>, CACHE2, AuctionCost> &f = *g_f;
-		displayTime(start_time, "setup completed");
-		if (relaxed)
-			assignSingle(coupling, c, f, beta);
-		else
-			auctionSingle(coupling, c, f, beta, false, 0, [&]()
+		DirectCost<AC, GETCOST> c(getcost, target_size);
+		FindCaching<DirectCost<AC, GETCOST>, CACHE2, AC> f(target_size, c, beta);
+		lap::displayTime(start_time, "setup completed", std::cout);
+		auctionSingle(coupling, c, f, beta, initial_epsilon, [&]()
 		{
 #pragma omp parallel for
 			for (int x = 0; x < target_size; x++)
@@ -483,40 +271,29 @@ void auctionAlgorithm(int *linear_index, float *linear_target, int target_size, 
 				// slack...
 				if (coupling[x] != -1) linear_index[coupling[x]] = x;
 			}
-			float cost = getCurrentCost(linear_index, linear_target, target_size, linear_source, source_size, total_channel) * total_channel;
+			AC cost = getCurrentCost<AC, GETCOST>(linear_index, getcost, target_size);
 			return cost;
 		});
 	}
 
-	if (relaxed)
-	{
-		// coupling is the other way round
 #pragma omp parallel for
-		for (int x = 0; x < target_size; x++)
-		{
-			linear_index[x] = coupling[x];
-		}
-	}
-	else
+	for (int x = 0; x < target_size; x++)
 	{
-#pragma omp parallel for
-		for (int x = 0; x < target_size; x++)
-		{
-			// slack...
-			if (coupling[x] != -1) linear_index[coupling[x]] = x;
-		}
+		// slack...
+		if (coupling[x] != -1) linear_index[coupling[x]] = x;
 	}
 }
 
-AuctionCost getCurrentCost(int *linear_index, float *linear_target, int target_size, float *linear_source, int source_size, int total_channel)
+template <class AC, class GETCOST>
+AC getCurrentCost(int *linear_index, GETCOST &getcost, int target_size)
 {
-	AuctionCost cost = AuctionCost(0.0);
+	AC cost = AC(0);
 	{
-		DirectCost<AuctionCost> c(linear_target, target_size, linear_source, source_size, total_channel);
+		DirectCost<AC, GETCOST> c(getcost, target_size);
 		for (int i = 0; i < target_size; i++)
 		{
 			cost += c.getCost(i, linear_index[i]);
 		}
 	}
-	return cost / (AuctionCost)target_size;
+	return cost;
 }

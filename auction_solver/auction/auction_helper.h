@@ -36,6 +36,7 @@ int src_idx(int x, int source_size, int target_size)
 	return (int)(((long long)x * (long long)(source_size - 1) + (long long)((target_size - 1) >> 1)) / (long long)(target_size - 1));
 }
 
+#if 0
 template <class TP>
 void displayTime(TP &start_time, const char *msg)
 {
@@ -169,7 +170,7 @@ void displayProgress(TP &start_time, int &elapsed, int completed, int target_siz
 	displayProgressBase(start_time, elapsed, completed, target_size, iteration, epsilon, display);
 }
 
-template <class TP, class AC>
+template <class AC, class TP>
 void displayProgressCost(TP &start_time, int &elapsed, int completed, int target_size, int &iteration, AC epsilon, AC cost)
 {
 	char msg[1024];
@@ -177,47 +178,4 @@ void displayProgressCost(TP &start_time, int &elapsed, int completed, int target
 	displayProgressBase(start_time, elapsed, completed, target_size, iteration, epsilon, true, msg);
 }
 
-template <class TP>
-bool displayProgress(TP &start_time, int &elapsed, int completed, int target_size, const char *msg = NULL, int iteration = -1, bool display = false)
-{
-	auto end_time = std::chrono::high_resolution_clock::now();
-	long long ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-
-	if ((elapsed * 10000 < ms) || (completed == target_size))
-	{
-		display = true;
-	}
-
-#ifdef DISPLAY_ALWAYS
-	display = true;
 #endif
-
-	if (display)
-	{
-		elapsed = (int)((ms + 10000ll) / 10000ll);
-		char time[256];
-		long long sec = ms / 1000;
-		ms -= sec * 1000;
-		long long min = sec / 60;
-		sec -= min * 60;
-		long long hrs = min / 60;
-		min -= hrs * 60;
-		sprintf_s(time, "%3d:%02d:%02d.%03d", (int)hrs, (int)min, (int)sec, (int)ms);
-		if (completed == target_size)
-		{
-			logger << time << ": solving " << completed << "/" << target_size;
-			if (iteration >= 0) logger << " iteration = " << iteration;
-			if (msg != NULL) logger << msg;
-			logger << std::endl;
-			logger.flush();
-		}
-		else
-		{
-			std::cout << time << ": solving " << completed << "/" << target_size;
-			if (iteration >= 0) std::cout << " iteration = " << iteration;
-			if (msg != NULL) std::cout << msg;
-			std::cout << std::endl;
-		}
-	}
-	return display;
-}

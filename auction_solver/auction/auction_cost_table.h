@@ -10,7 +10,8 @@ private:
 	std::vector<std::vector<AC>> c;
 	int target_size;
 public:
-	TableCost(float *linear_target, int target_size, float *linear_source, int source_size, int total_channel)
+	template <typename GETCOST>
+	TableCost(GETCOST &getcost, int target_size)
 		: target_size(target_size)
 	{
 		c.resize(target_size);
@@ -20,15 +21,7 @@ public:
 		{
 			for (int y = 0; y < target_size; y++)
 			{
-				int y0 = src_idx(y, source_size, target_size);
-				AC cost = AC(0.0);
-				for (int cc = 0; cc < total_channel; cc++)
-				{
-					AC d = linear_source[cc * source_size + y0] - linear_target[cc * target_size + x];
-					cost = cost + d * d;
-				}
-				cost /= (AC)total_channel;
-				c[x][y] = cost;
+				c[x][y] = getcost(x, y);
 			}
 		}
 	}
