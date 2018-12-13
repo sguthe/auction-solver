@@ -131,7 +131,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool e
 				}
 			}
 
-			// run auction solver with table
+			// run auction solver with table, need to wrap around another one since we need this transposed...
 			{
 				auctionAlgorithm<C>(rowsol, [&](int x, int y) { return tab[y + x * N]; }, N, eps, true);
 			}
@@ -202,6 +202,8 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 
 			int *rowsol = new int[N];
 
+			C eps = C(0);
+
 			if (omp)
 			{
 #ifdef LAP_OPENMP
@@ -209,11 +211,9 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 				lap::omp::Worksharing ws(N, costFunction.getMultiple());
 				lap::omp::TableCost<C> costMatrix(N, costFunction, ws);
 				lap::omp::DirectIterator<C, C, decltype(costMatrix)> iterator(N, N, costMatrix, ws);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator) / (disjoint ? C(10.0) : C(1000.0)));
+				if (epsilon) costMatrix.setInitialEpsilon(eps = (lap::omp::guessEpsilon<C>(N, N, iterator) / (disjoint ? C(10.0) : C(1000.0))));
 
 #endif
-				delete[] tab_s;
-				delete[] tab_t;
 #ifdef LAP_OPENMP
 				lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -231,10 +231,7 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
 				lap::TableCost<C> costMatrix(N, costFunction);
 				lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N, N, costMatrix);
-				if (epsilon) costMatrix.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator) / (disjoint ? C(10.0) : C(1000.0)));
-
-				delete[] tab_s;
-				delete[] tab_t;
+				if (epsilon) costMatrix.setInitialEpsilon(eps = (lap::guessEpsilon<C>(N, N, iterator) / (disjoint ? C(10.0) : C(1000.0))));
 
 				lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -247,6 +244,13 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 				}
 			}
 
+			// run auction solver with table, need to wrap around a table here
+			{
+				auctionAlgorithm<C>(rowsol, get_cost, N, eps, true);
+			}
+
+			delete[] tab_s;
+			delete[] tab_t;
 			delete[] rowsol;
 		}
 	}
@@ -311,6 +315,8 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 
 			int *rowsol = new int[N];
 
+			C eps(0);
+
 			if (omp)
 			{
 #ifdef LAP_OPENMP
@@ -320,14 +326,14 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 				if (4 * entries < N)
 				{
 					lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction, ws);
-					if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0)));
+					if (epsilon) costFunction.setInitialEpsilon(eps = (lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0))));
 					lap::displayTime(start_time, "setup complete", std::cout);
 					lap::omp::solve<C>(N, costFunction, iterator, rowsol);
 				}
 				else
 				{
 					lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction, ws);
-					if (epsilon) costFunction.setInitialEpsilon(lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0)));
+					if (epsilon) costFunction.setInitialEpsilon(eps = (lap::omp::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0))));
 					lap::displayTime(start_time, "setup complete", std::cout);
 					lap::omp::solve<C>(N, costFunction, iterator, rowsol);
 				}
@@ -346,14 +352,14 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 				if (4 * entries < N)
 				{
 					lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, entries, costFunction);
-					if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0)));
+					if (epsilon) costFunction.setInitialEpsilon(eps = (lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0))));
 					lap::displayTime(start_time, "setup complete", std::cout);
 					lap::solve<C>(N, costFunction, iterator, rowsol);
 				}
 				else
 				{
 					lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N, N, entries, costFunction);
-					if (epsilon) costFunction.setInitialEpsilon(lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0)));
+					if (epsilon) costFunction.setInitialEpsilon(eps = (lap::guessEpsilon<C>(N, N, iterator, (int)(N / entries)) / (disjoint ? C(10.0) : C(1000.0))));
 					lap::displayTime(start_time, "setup complete", std::cout);
 					lap::solve<C>(N, costFunction, iterator, rowsol);
 				}
@@ -363,6 +369,11 @@ void testGeometricCached(long long max_tab, long long min_cached, long long max_
 					ss << "cost = " << lap::cost<C, C>(N, costFunction, rowsol);
 					lap::displayTime(start_time, ss.str().c_str(), std::cout);
 				}
+			}
+
+			// run auction solver without table
+			{
+				auctionAlgorithm<C>(rowsol, get_cost, N, eps, false);
 			}
 
 			delete[] rowsol;

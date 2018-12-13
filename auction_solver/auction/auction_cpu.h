@@ -122,8 +122,9 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AC>
 	// loop until done
 
 	int elapsed = 0;
-	AC old_epsilon = epsilon * AC(2) + AC(1);
 	AC epsilon_lower = epsilon / AC(target_size);
+	epsilon *= AC(25);
+	AC old_epsilon = epsilon * AC(2) + AC(1);
 	int iteration = 0;
 
 	AuctionOneWay<AC> auction;
@@ -163,6 +164,11 @@ void auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AC>
 		}
 		u_count[0] = target_size;
 
+#ifndef LAP_QUIET
+		std::stringstream ss;
+		ss << " eps = " << epsilon;
+		lap::displayTime(start_time, ss.str().c_str(), std::cout);
+#endif
 		while (completed < target_size)
 		{
 #ifndef LAP_QUIET
@@ -244,7 +250,7 @@ void auctionAlgorithm(int *linear_index, GETCOST &getcost, int target_size, AC i
 	if (table)
 	{
 		TableCost<AC> c(getcost, target_size);
-		FindLinear<TableCost<AC>, AC> f(target_size);
+		FindCaching<TableCost<AC>, CACHE1, AC> f(target_size, c, beta);
 		lap::displayTime(start_time, "setup completed", std::cout);
 		auctionSingle(coupling, c, f, beta, initial_epsilon, [&]()
 		{
