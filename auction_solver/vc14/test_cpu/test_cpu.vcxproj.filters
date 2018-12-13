@@ -15,16 +15,25 @@
     <Filter Include="core\omp">
       <UniqueIdentifier>{ed124daf-e917-4ca8-a157-b2205806e7c5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="auction">
+      <UniqueIdentifier>{fd447c15-8d71-4ae4-9b57-863c8eea9726}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="auction\Header Files">
+      <UniqueIdentifier>{c36a5d10-12ef-4e18-8cd8-8a8f9641ffd2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="auction\Source Files">
+      <UniqueIdentifier>{faecd80a-4c4e-4bfb-b8af-d9480ce8c53c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\test\test_cpu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\auction\auction_cpu.cpp">
+      <Filter>auction\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\test\test_options.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\lap_solver\lap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -60,6 +69,33 @@
     </ClInclude>
     <ClInclude Include="..\..\..\lap_solver\core\omp\lap_worksharing.h">
       <Filter>core\omp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\lap_solver\test\test_options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_cost_direct.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_cost_table.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_cpu.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_find_caching.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_find_linear.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_one_way.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_helper.h">
+      <Filter>auction\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_heap.h">
+      <Filter>auction\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -19,18 +19,18 @@ private:
 	std::vector<std::vector<AC>> m_cost;
 	int m_real_pending;
 private:
-	__forceinline__ void enqueue(int v, int &c, std::vector<int> &l)
+	void enqueue(int v, int &c, std::vector<int> &l)
 	{
 		l[c++] = v;
 	}
-	__forceinline__ void enqueue(int v, int &c, std::vector<int> &l, std::vector<int> &u)
+	void enqueue(int v, int &c, std::vector<int> &l, std::vector<int> &u)
 	{
 		if (u[v] == 0) l[c++] = v;
 		u[v]++;
 	}
 
 	template <bool PAR>
-	__forceinline__ void auctionBidding(
+	void auctionBidding(
 		int x, int y, std::pair<AC, AC> cost, 
 		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, 
 		int &r_count, std::vector<int> &receiving, 
@@ -97,7 +97,7 @@ private:
 	}
 
 	template <bool EXACT>
-	__forceinline__ void auctionBuying(
+	void auctionBuying(
 		std::vector<int> &coupling, std::vector<AC> &beta, 
 		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, 
 		int &r_count, std::vector<int> &receiving, 
@@ -195,192 +195,6 @@ private:
 		r_count = 0;
 	}
 
-#if 1
-	template <bool PAR>
-	__forceinline__ void auctionBiddingMultiple(
-		std::vector<int> &coupling, int x, std::vector<int> &y, std::pair<AC, AC> &cost,
-		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, std::vector<std::vector<int>> &unassigned_count,
-		int &r_count, std::vector<int> &receiving, 
-		std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block)
-#else
-		template <bool PAR>
-		__forceinline__ void auctionBiddingMultiple(
-			std::vector<int> &coupling, int x, std::vector<int> &y, std::pair<AC, AC> &cost,
-			int &u_count, std::vector<int> &unassigned, std::vector<int> &unassigned_count,
-			int &r_count, std::vector<int> &receiving,
-			std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block)
-#endif
-	{
-		// too many possible assignmemts
-		std::sort(y.begin(), y.end());
-		AC ccost = cost.first - cost.second;
-
-		int i = 0;
-		int j = 0;
-		while (j < unassigned_count[1][x])
-		{
-			int queue_index = -1;
-			if (i < (int)y.size())
-			{
-				AC first_cost = B[y[i]].second;
-				int first_index = B[y[i]].first;
-				if ((ccost < first_cost) || ((ccost == first_cost) && (x < first_index)))
-				{
-					if (!PAR)
-					{
-						std::lock_guard<std::mutex> lock(Block[y[i]]);
-						AC second_cost = B[y[i]].second;
-						int second_index = B[y[i]].first;
-						if ((ccost < second_cost) || ((ccost == second_cost) && (x < second_index)))
-						{
-							if (second_index != -1) queue_index = second_index;
-							else
-							{
-#pragma omp critical
-								enqueue(y[i], r_count, receiving);
-							}
-							B[y[i]].first = x;
-							B[y[i]].second = ccost;
-							j++;
-						}
-						else
-						{
-							//queue_index = x;
-							//j++;
-						}
-					}
-					else
-					{
-						if (first_index != -1) queue_index = first_index;
-						else enqueue(y[i], r_count, receiving);
-						B[y[i]].first = x;
-						B[y[i]].second = ccost;
-						j++;
-					}
-				}
-				else
-				{
-				}
-				i++;
-			}
-			else
-			{
-				queue_index = x;
-				j++;
-			}
-			if (queue_index != -1)
-			{
-				if (!PAR)
-				{
-#if 1
-#pragma omp critical
-					enqueue(queue_index, u_count[0], unassigned[0], unassigned_count[0]);
-#else
-					unassigned_count[queue_index]++;
-#endif
-#pragma omp atomic
-					m_real_pending++;
-				}
-				else
-				{
-#if 1
-					enqueue(queue_index, u_count[0], unassigned[0], unassigned_count[0]);
-#else
-					unassigned_count[queue_index]++;
-#endif
-					m_real_pending++;
-				}
-			}
-		}
-		unassigned_count[1][x] = 0;
-	}
-
-#if 1
-	__forceinline__ void auctionBuyingMultiple(
-		std::vector<int> &coupling, std::vector<AC> &beta,
-		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, std::vector<std::vector<int>> &unassigned_count,
-		int &r_count, std::vector<int> &receiving,
-		std::vector<std::pair<volatile int, volatile AC>> &B, AC epsilon)
-#else
-	__forceinline__ void auctionBuyingMultiple(
-		std::vector<int> &coupling, std::vector<AC> &beta,
-		int &u_count, std::vector<int> &unassigned, std::vector<int> &unassigned_count,
-		int &r_count, std::vector<int> &receiving,
-		std::vector<std::pair<volatile int, volatile AC>> &B, AC epsilon)
-#endif
-	{
-		const int rc = r_count;
-
-		if (false)//if (rc >= BUYING_THREAD_COUNT)
-		{
-#pragma omp parallel for schedule(static)
-			for (int yi = 0; yi < rc; yi++)
-			{
-				int y = receiving[yi];
-				int queue_index = -1;
-
-				if (coupling[y] != -1)
-				{
-					queue_index = coupling[y];
-					coupling[y] = -1;
-				}
-				AC cost = B[y].second;
-				int x = B[y].first;
-
-				beta[y] += cost - epsilon;
-
-				coupling[y] = x;
-
-				if (queue_index != -1)
-				{
-#if 1
-#pragma omp critical
-					enqueue(queue_index, u_count[0], unassigned[0], unassigned_count[0]);
-#else
-#pragma omp critical
-					unassigned_count[queue_index]++;
-#endif
-#pragma omp atomic
-					m_real_pending++;
-				}
-				B[y].first = -1;
-				B[y].second = MAX_COST;
-			}
-		}
-		else
-		{
-			for (int yi = 0; yi < rc; yi++)
-			{
-				int y = receiving[yi];
-				int queue_index = -1;
-
-				if (coupling[y] != -1)
-				{
-					queue_index = coupling[y];
-					coupling[y] = -1;
-				}
-				AC cost = B[y].second;
-				int x = B[y].first;
-
-				beta[y] += cost - epsilon;
-
-				coupling[y] = x;
-
-				if (queue_index != -1)
-				{
-					enqueue(queue_index, u_count[0], unassigned[0], unassigned_count[0]);
-//					unassigned_count[queue_index]++;
-					m_real_pending++;
-				}
-				B[y].first = -1;
-				B[y].second = MAX_COST;
-			}
-		}
-
-		r_count = 0;
-	}
-
-
 public:
 	AuctionOneWay()
 	{
@@ -389,7 +203,7 @@ public:
 	}
 
 	template <bool EXACT, class COST, class FIND>
-	__forceinline__ int auction(
+	int auction(
 		std::vector<int> &coupling, std::vector<AC> &beta, 
 		COST &c, FIND &f, 
 		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, 
@@ -398,7 +212,7 @@ public:
 #endif
 		int &r_count, std::vector<int> &receiving,
 		std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block, 
-		int target_size, AC epsilon, bool update, int num_cuda)
+		int target_size, AC epsilon, bool update)
 	{
 		std::swap(unassigned[0], unassigned[1]);
 		u_count[1] = u_count[0];
@@ -460,12 +274,10 @@ public:
 #endif
 		if (dc > 0)
 		{
-			if (((num_cuda == 0) && (5 * dc >= 4 * processor_count)) || (dc >= processor_count * 12))
+			if ((5 * dc >= 4 * processor_count) || (dc >= processor_count * 12))
 			{
 #pragma omp parallel
 				{
-					int t = omp_get_thread_num();
-					if (c.cudaEnabled(t)) cudaSetDevice(t);
 #pragma omp for schedule(dynamic)
 					for (int xi = 0; xi < dc; xi++)
 					{
@@ -479,35 +291,13 @@ public:
 			}
 			else
 			{
-				if (num_cuda > 0)
+				for (int xi = 0; xi < dc; xi++)
 				{
-					omp_set_num_threads(std::min(dc, num_cuda));
-#pragma omp parallel
-					{
-						int t = omp_get_thread_num();
-						if (c.cudaEnabled(t)) cudaSetDevice(t);
-#pragma omp for schedule(dynamic)
-						for (int xi = 0; xi < dc; xi++)
-						{
-							int x = deferred[xi];
-							std::pair<int, int> y(-1, -1);
-							std::pair<AC, AC> cost;
-							f.template fillCache<false, false>(c, x, y, cost, beta);
-							auctionBidding<false>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
-						}
-					}
-					omp_set_num_threads(processor_count);
-				}
-				else
-				{
-					for (int xi = 0; xi < dc; xi++)
-					{
-						int x = deferred[xi];
-						std::pair<int, int> y(-1, -1);
-						std::pair<AC, AC> cost;
-						f.template fillCache<true, false>(c, x, y, cost, beta);
-						auctionBidding<true>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
-					}
+					int x = deferred[xi];
+					std::pair<int, int> y(-1, -1);
+					std::pair<AC, AC> cost;
+					f.template fillCache<true, false>(c, x, y, cost, beta);
+					auctionBidding<true>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
 				}
 			}
 		}
@@ -522,14 +312,14 @@ public:
 	}
 
 	template <class COST, class FIND>
-	__forceinline__ int assign(
+	int assign(
 		std::vector<int> &coupling, std::vector<AC> &beta,
 		COST &c, FIND &f,
 		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned,
 #ifdef DEFER_MISS
 		int &d_count, std::vector<int> &deferred,
 #endif
-		int target_size, bool update, int num_cuda)
+		int target_size, bool update)
 	{
 		std::swap(unassigned[0], unassigned[1]);
 		u_count[1] = u_count[0];
@@ -572,12 +362,10 @@ public:
 #endif
 		if (dc > 0)
 		{
-			if (((num_cuda == 0) && (5 * dc >= 4 * processor_count)) || (dc >= processor_count * 12))
+			if ((5 * dc >= 4 * processor_count) || (dc >= processor_count * 12))
 			{
 #pragma omp parallel
 				{
-					int t = omp_get_thread_num();
-					if (c.cudaEnabled(t)) cudaSetDevice(t);
 #pragma omp for schedule(dynamic)
 					for (int xi = 0; xi < dc; xi++)
 					{
@@ -591,35 +379,13 @@ public:
 			}
 			else
 			{
-				if (num_cuda > 0)
+				for (int xi = 0; xi < dc; xi++)
 				{
-					omp_set_num_threads(std::min(dc, num_cuda));
-#pragma omp parallel
-					{
-						int t = omp_get_thread_num();
-						if (c.cudaEnabled(t)) cudaSetDevice(t);
-#pragma omp for schedule(dynamic)
-						for (int xi = 0; xi < dc; xi++)
-						{
-							int x = deferred[xi];
-							std::pair<int, int> y(-1, -1);
-							std::pair<AC, AC> cost;
-							f.template fillCache<false, false>(c, x, y, cost, beta);
-							coupling[x] = y.first;
-						}
-					}
-					omp_set_num_threads(processor_count);
-				}
-				else
-				{
-					for (int xi = 0; xi < dc; xi++)
-					{
-						int x = deferred[xi];
-						std::pair<int, int> y(-1, -1);
-						std::pair<AC, AC> cost;
-						f.template fillCache<true, false>(c, x, y, cost, beta);
-						coupling[x] = y.first;
-					}
+					int x = deferred[xi];
+					std::pair<int, int> y(-1, -1);
+					std::pair<AC, AC> cost;
+					f.template fillCache<true, false>(c, x, y, cost, beta);
+					coupling[x] = y.first;
 				}
 			}
 		}
@@ -633,7 +399,7 @@ public:
 
 #if 1
 	template <class COST, class FIND>
-	__forceinline__ int auctionMultiple(
+	int auctionMultiple(
 		std::vector<int> &coupling, std::vector<AC> &beta, 
 		COST &c, FIND &f, 
 		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, std::vector<std::vector<int>> &unassigned_count,
@@ -641,7 +407,7 @@ public:
 		std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block, AC epsilon)
 #else
 	template <class COST, class FIND>
-	__forceinline__ int auctionMultiple(
+	int auctionMultiple(
 		std::vector<int> &coupling, std::vector<AC> &beta,
 		COST &c, FIND &f,
 		int &u_count, std::vector<int> &unassigned, std::vector<int> &unassigned_count,

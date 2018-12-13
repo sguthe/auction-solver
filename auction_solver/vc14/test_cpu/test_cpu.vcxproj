@@ -144,6 +144,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\auction\auction_cpu.cpp" />
     <ClCompile Include="..\..\test\test_cpu.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -160,6 +161,14 @@
     <ClInclude Include="..\..\..\lap_solver\core\omp\lap_worksharing.h" />
     <ClInclude Include="..\..\..\lap_solver\lap.h" />
     <ClInclude Include="..\..\..\lap_solver\test\test_options.h" />
+    <ClInclude Include="..\..\auction\auction_cost_direct.h" />
+    <ClInclude Include="..\..\auction\auction_cost_table.h" />
+    <ClInclude Include="..\..\auction\auction_cpu.h" />
+    <ClInclude Include="..\..\auction\auction_find_caching.h" />
+    <ClInclude Include="..\..\auction\auction_find_linear.h" />
+    <ClInclude Include="..\..\auction\auction_heap.h" />
+    <ClInclude Include="..\..\auction\auction_helper.h" />
+    <ClInclude Include="..\..\auction\auction_one_way.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

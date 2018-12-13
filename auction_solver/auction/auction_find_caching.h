@@ -5,7 +5,6 @@
 
 #include "auction_helper.h"
 #include "auction_heap.h"
-#include "../kernel/helper.h"
 
 extern int processor_count;
 
@@ -54,7 +53,6 @@ public:
 #pragma omp parallel
 			{
 				int t = omp_get_thread_num();
-				if (c.cudaEnabled(t)) cudaSetDevice(t);
 #pragma omp for schedule(dynamic)
 				for (int x = 0; x < target_size; x++)
 				{
@@ -86,23 +84,13 @@ public:
 			heap[CACHE] = mod * mod;
 			//heap[CACHE] = -1.0e36f;
 		}
-#pragma omp parallel
-		{
-			int t = omp_get_thread_num();
-			if (c.cudaEnabled(t))
-			{
-				cudaSetDevice(t);
-				c.update_target_cuda(t, linear_target);
-				checkCudaErrors(cudaDeviceSynchronize());
-			}
-		}
 	}
 
 	~FindCaching() {}
 
 	// this doesn't have to be the same class
 	template <bool PAR, bool FILL_ONLY>
-	__forceinline__ void fillCache(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
+	void fillCache(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
 	{
 		std::vector<int> &idx = m_idx[x];
 		std::vector<AC> &heap = m_heap[x];
@@ -161,31 +149,21 @@ public:
 		}
 		else
 		{
-			if (c.cudaEnabled(omp_get_thread_num()))
+			c.template iterate<PAR>([&](int yy, AC ccost)
 			{
-				c.cudaFill(idx, heap, x);
-				// rest will be filled later
-				int yy = idx[CACHE];
-				heap[CACHE] = c.getCost(x, yy) - beta[yy];
-			}
-			else
-			{
-				c.template iterate<PAR>([&](int yy, AC ccost)
+				if (N < CACHE + 1)
 				{
-					if (N < CACHE + 1)
-					{
-						heap_insert(heap, idx, N, ccost, yy);
-					}
-					else
-					{
-						heap_replace(heap, idx, N, ccost, yy);
-						limit = heap[0];
-					}
-				}, x, limit, beta);
-				// for a heap the max is at 0 but we need it at the end.
-				std::swap(heap[0], heap[CACHE]);
-				std::swap(idx[0], idx[CACHE]);
-			}
+					heap_insert(heap, idx, N, ccost, yy);
+				}
+				else
+				{
+					heap_replace(heap, idx, N, ccost, yy);
+					limit = heap[0];
+				}
+			}, x, limit, beta);
+			// for a heap the max is at 0 but we need it at the end.
+			std::swap(heap[0], heap[CACHE]);
+			std::swap(idx[0], idx[CACHE]);
 		}
 
 
@@ -235,7 +213,7 @@ public:
 	}
 
 	template <bool PAR>
-	__forceinline__ bool findBid(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
+	bool findBid(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
 	{
 		y.first = y.second = -1;
 		cost.first = cost.second = MAX_COST;
@@ -293,7 +271,7 @@ public:
 #endif
 	}
 
-	__forceinline__ void fixBeta(AC dlt)
+	void fixBeta(AC dlt)
 	{
 #pragma omp parallel for
 		for (int x = 0; x < target_size; x++)
@@ -302,166 +280,8 @@ public:
 		}
 	}
 
-	__forceinline__ void unblock() { }
-	__forceinline__ void block() { }
-};
-
-template <class COST, int CACHE, class AC>
-class FindCachingMultiple : public FindCaching<COST, CACHE, AC>
-{
-private:
-	int reduced_size;
-public:
-	FindCachingMultiple(int target_size, COST &c, std::vector<AC> &beta) : FindCaching<COST, CACHE, AC>::FindCaching(target_size, c, beta) {}
-
-	template <bool PAR>
-	__forceinline__ bool findBid(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta) { return FindCaching<COST, CACHE, AC>::template findBid<PAR>(c, x, y, cost, beta); }
-
-	template <bool PAR>
-	__forceinline__	bool findBid(COST &c, int x, std::vector<int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta, std::vector<int> &coupling)
-	{
-		y.clear();
-		cost.first = cost.second = MAX_COST;
-		// cached
-		std::vector<int> &idx = FindCaching<COST, CACHE, AC>::m_idx[x];
-		std::vector<AC> &heap = FindCaching<COST, CACHE, AC>::m_heap[x];
-		if (!idx.empty())
-		{
-			//int N = 0;
-			for (int yi = 0; yi < CACHE; yi++)
-			{
-				int yy = idx[yi];
-				//if (coupling[yy] != x)
-				{
-					AC ccost = heap[yi] - beta[yy];
-					if (ccost < cost.first)
-					{
-						y.clear();
-						y.push_back(yy);
-						cost.second = cost.first;
-						cost.first = ccost;
-					}
-					else if (ccost == cost.first)
-					{
-						y.push_back(yy);
-					}
-					else if (ccost < cost.second)
-					{
-						cost.second = ccost;
-					}
-				}
-			}
-			if (cost.second <= heap[CACHE])
-			{
-#ifdef DISPLAY_MISS
-				if (PAR)
-				{
-					hit_count++;
-				}
-				else
-				{
-#pragma omp atomic
-					hit_count++;
-				}
-#endif
-				return true;
-			}
-			cost.first = cost.second = MAX_COST;
-			y.clear();
-
-		}
-		else
-		{
-			idx.resize(CACHE + 1);
-			heap.resize(CACHE + 1);
-		}
-
-#ifdef DISPLAY_MISS
-		if (PAR)
-		{
-			miss_count++;
-		}
-		else
-		{
-#pragma omp atomic
-			miss_count++;
-		}
-#endif
-
-		// cache didn't work so rebuild it
-		int N = 0;
-		AC limit = MAX_COST;
-		c.template iterateMulti<PAR>([&](int yy, AC ccost)
-		{
-			// not sure if this will actually work...
-			//if (coupling[yy] != x)
-			{
-				if (PAR)
-				{
-#pragma omp critical
-					{
-						if (N < CACHE + 1)
-							heap_insert(heap, idx, N, ccost, yy);
-						else
-						{
-							heap_replace(heap, idx, N, ccost, yy);
-							limit = heap[0];
-						}
-					}
-				}
-				else
-				{
-					if (N < CACHE + 1)
-						heap_insert(heap, idx, N, ccost, yy);
-					else
-					{
-						heap_replace(heap, idx, N, ccost, yy);
-						limit = heap[0];
-					}
-				}
-			}
-		}, x, limit, beta);
-
-		// for a heap the max is at 0 but we need it at the end.
-		std::swap(heap[0], heap[CACHE]);
-		std::swap(idx[0], idx[CACHE]);
-		// scan with beta
-		N = 0;
-		for (int yi = 0; yi < CACHE; yi++)
-		{
-			int yy = idx[yi];
-			//if (coupling[yy] != x)
-			{
-				AC ccost = heap[yi];
-				heap[yi] = c.getCostMulti2(x, yy);
-				if (ccost < cost.first)
-				{
-					y.clear();
-					y.push_back(yy);
-					cost.second = cost.first;
-					cost.first = ccost;
-				}
-				else if (ccost == cost.first)
-				{
-					y.push_back(yy);
-				}
-				else if (ccost < cost.second)
-				{
-					cost.second = ccost;
-				}
-			}
-		}
-		return true;
-	}
-
-	__forceinline__ void restart()
-	{
-		// clear all caches
-		FindCaching<COST, CACHE, AC>::m_idx.clear();
-		FindCaching<COST, CACHE, AC>::m_heap.clear();
-		FindCaching<COST, CACHE, AC>::m_idx.resize(FindCaching<COST, CACHE, AC>::target_size);
-		FindCaching<COST, CACHE, AC>::m_heap.resize(FindCaching<COST, CACHE, AC>::target_size);
-	}
+	void unblock() { }
+	void block() { }
 };
 
 template <class COST, int CACHE, class AC>
@@ -508,8 +328,6 @@ public:
 			}
 #pragma omp parallel
 			{
-				int t = omp_get_thread_num();
-				if (c.cudaEnabled(t)) cudaSetDevice(t);
 #pragma omp for schedule(dynamic)
 				for (int x = 0; x < target_size; x++)
 				{
@@ -541,23 +359,13 @@ public:
 			heap[CACHE] = mod * mod;
 			//heap[CACHE] = -1.0e36f;
 		}
-#pragma omp parallel
-		{
-			int t = omp_get_thread_num();
-			if (c.cudaEnabled(t))
-			{
-				cudaSetDevice(t);
-				c.update_target_cuda(t, linear_target);
-				checkCudaErrors(cudaDeviceSynchronize());
-			}
-		}
 	}
 
 	~FindCachingReverse() {}
 
 	// this doesn't have to be the same class
 	template <bool PAR, bool FILL_ONLY>
-	__forceinline__ void fillCache(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
+	void fillCache(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
 	{
 		std::vector<int> &idx = m_idx[x];
 		std::vector<AC> &heap = m_heap[x];
@@ -616,31 +424,21 @@ public:
 		}
 		else
 		{
-			if (c.cudaEnabled(omp_get_thread_num()))
+			c.template iterateReverse<PAR>([&](int yy, AC ccost)
 			{
-				c.cudaFillReverse(idx, heap, x);
-				// rest will be filled later
-				int yy = idx[CACHE];
-				heap[CACHE] = c.getCost(yy, x) - beta[yy];
-			}
-			else
-			{
-				c.template iterateReverse<PAR>([&](int yy, AC ccost)
+				if (N < CACHE + 1)
 				{
-					if (N < CACHE + 1)
-					{
-						heap_insert(heap, idx, N, ccost, yy);
-					}
-					else
-					{
-						heap_replace(heap, idx, N, ccost, yy);
-						limit = heap[0];
-					}
-				}, x, limit, beta);
-				// for a heap the max is at 0 but we need it at the end.
-				std::swap(heap[0], heap[CACHE]);
-				std::swap(idx[0], idx[CACHE]);
-			}
+					heap_insert(heap, idx, N, ccost, yy);
+				}
+				else
+				{
+					heap_replace(heap, idx, N, ccost, yy);
+					limit = heap[0];
+				}
+			}, x, limit, beta);
+			// for a heap the max is at 0 but we need it at the end.
+			std::swap(heap[0], heap[CACHE]);
+			std::swap(idx[0], idx[CACHE]);
 		}
 
 
@@ -689,7 +487,7 @@ public:
 	}
 
 	template <bool PAR>
-	__forceinline__ bool findBid(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
+	bool findBid(COST &c, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
 	{
 		y.first = y.second = -1;
 		cost.first = cost.second = MAX_COST;
@@ -747,7 +545,7 @@ public:
 #endif
 	}
 
-	__forceinline__ void fixBeta(AC dlt)
+	void fixBeta(AC dlt)
 	{
 #pragma omp parallel for
 		for (int x = 0; x < target_size; x++)
@@ -756,7 +554,7 @@ public:
 		}
 	}
 
-	__forceinline__ void unblock() { }
-	__forceinline__ void block() { }
+	void unblock() { }
+	void block() { }
 };
 

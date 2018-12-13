@@ -3,7 +3,8 @@
 #endif
 #define LAP_QUIET
 //#define LAP_DEBUG
-#include "../lap.h"
+#include "../../lap_solver/lap.h"
+#include "../auction/auction_cpu.h"
 
 #include <random>
 #include <string>
