@@ -240,6 +240,7 @@ AC auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AC> &
 	return cost;
 }
 
+#if 0
 template <class AC, class GETCOST>
 void auctionAlgorithm(int *linear_index, GETCOST &getcost, int target_size, AC initial_epsilon, bool table, bool caching, bool parallel, int max_size)
 {
@@ -298,6 +299,7 @@ void auctionAlgorithm(int *linear_index, GETCOST &getcost, int target_size, AC i
 		if (coupling[x] != -1) linear_index[coupling[x]] = x;
 	}
 }
+#endif
 
 template <class AC, class GETCOST>
 AC getCurrentCost(int *linear_index, GETCOST &c, int target_size)
