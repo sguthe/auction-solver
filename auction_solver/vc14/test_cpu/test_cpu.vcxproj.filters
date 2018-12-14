@@ -61,9 +61,6 @@
     <ClInclude Include="..\..\..\lap_solver\core\omp\lap_worksharing.h">
       <Filter>core\omp</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\lap_solver\test\test_options.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\auction\auction_cost_table.h">
       <Filter>auction</Filter>
     </ClInclude>
@@ -86,6 +83,12 @@
       <Filter>auction</Filter>
     </ClInclude>
     <ClInclude Include="..\..\auction\auction_cost_direct.h">
+      <Filter>auction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\test\test_options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\auction\auction_cost_adapter.h">
       <Filter>auction</Filter>
     </ClInclude>
   </ItemGroup>

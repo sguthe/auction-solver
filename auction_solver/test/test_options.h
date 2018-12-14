@@ -18,6 +18,7 @@ public:
 	bool use_single;
 	bool use_epsilon;
 	bool use_omp;
+	bool use_caching;
 
 	bool run_random;
 	bool run_geometric;
@@ -31,7 +32,7 @@ public:
 	Options()
 	{
 		lap_min_tab = lap_max_tab = lap_min_cached = lap_max_cached = 0ll;
-		use_double = use_float = use_single = use_epsilon = use_omp = false;
+		use_double = use_float = use_single = use_epsilon = use_omp = use_caching = false;
 		run_random = run_geometric = run_geometric_cached = run_geometric_disjoint = run_geometric_disjoint_cached = false;
 		runs = 1;
 	}
@@ -133,6 +134,10 @@ public:
 #else
 				std::cout << "OpenMP not enabled." << std::endl;
 #endif
+			}
+			else if (!strcmp(argv[i], "-caching"))
+			{
+				use_caching = true;
 			}
 			else if (!strcmp(argv[i], "-img"))
 			{

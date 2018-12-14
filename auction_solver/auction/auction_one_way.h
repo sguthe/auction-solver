@@ -200,6 +200,7 @@ public:
 	{
 		m_y.resize(omp_get_max_threads());
 		m_cost.resize(omp_get_max_threads());
+		m_real_pending = 0;
 	}
 
 	template <bool EXACT, class COST, class FIND>
@@ -212,7 +213,7 @@ public:
 #endif
 		int &r_count, std::vector<int> &receiving,
 		std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block, 
-		int target_size, AC epsilon, bool update)
+		int target_size, AC epsilon, bool parallel)
 	{
 		std::swap(unassigned[0], unassigned[1]);
 		u_count[1] = u_count[0];
@@ -225,27 +226,50 @@ public:
 
 		if (uc >= BIDDING_THREAD_COUNT)
 		{
+			if (parallel)
+			{
 #ifdef DEFER_MISS
 #pragma omp parallel for
 #else
 #pragma omp parallel for schedule(dynamic)
 #endif
-			for (int xi = 0; xi < uc; xi++)
-			{
-				int x = unassigned[1][xi];
-				std::pair<int, int> y;
-				std::pair<AC, AC> cost;
-#ifdef DEFER_MISS
-				if (f.template findBid<false>(c, x, y, cost, beta)) auctionBidding<false>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
-				else
+				for (int xi = 0; xi < uc; xi++)
 				{
+					int x = unassigned[1][xi];
+					std::pair<int, int> y;
+					std::pair<AC, AC> cost;
+#ifdef DEFER_MISS
+					if (f.template findBid<false>(c, x, y, cost, beta)) auctionBidding<false>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
+					else
+					{
 #pragma omp critical
-					enqueue(x, d_count, deferred);
-				}
+						enqueue(x, d_count, deferred);
+					}
 #else
-				f.template findBid<false>(c, x, y, cost, beta);
-				auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
+					f.template findBid<false>(c, x, y, cost, beta);
+					auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
 #endif
+				}
+			}
+			else
+			{
+				for (int xi = 0; xi < uc; xi++)
+				{
+					int x = unassigned[1][xi];
+					std::pair<int, int> y;
+					std::pair<AC, AC> cost;
+#ifdef DEFER_MISS
+					if (f.template findBid<false>(c, x, y, cost, beta)) auctionBidding<false>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
+					else
+					{
+#pragma omp critical
+						enqueue(x, d_count, deferred);
+					}
+#else
+					f.template findBid<false>(c, x, y, cost, beta);
+					auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
+#endif
+				}
 			}
 		}
 		else
@@ -255,13 +279,26 @@ public:
 				int x = unassigned[1][xi];
 				std::pair<int, int> y;
 				std::pair<AC, AC> cost;
+				if (parallel)
+				{
 #ifdef DEFER_MISS
-				if (f.template findBid<true>(c, x, y, cost, beta)) auctionBidding<true>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
-				else enqueue(x, d_count, deferred);
+					if (f.template findBid<true>(c, x, y, cost, beta)) auctionBidding<true>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
+					else enqueue(x, d_count, deferred);
 #else
-				f.template findBid<true>(c, x, y, cost, beta);
-				auctionBidding<true>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
+					f.template findBid<true>(c, x, y, cost, beta);
+					auctionBidding<true>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
 #endif
+				}
+				else
+				{
+#ifdef DEFER_MISS
+					if (f.template findBid<false>(c, x, y, cost, beta)) auctionBidding<false>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
+					else enqueue(x, d_count, deferred);
+#else
+					f.template findBid<false>(c, x, y, cost, beta);
+					auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
+#endif
+				}
 			}
 		}
 
@@ -274,7 +311,7 @@ public:
 #endif
 		if (dc > 0)
 		{
-			if ((5 * dc >= 4 * processor_count) || (dc >= processor_count * 12))
+			if (parallel && ((5 * dc >= 4 * processor_count) || (dc >= processor_count * 12)))
 			{
 #pragma omp parallel
 				{
@@ -289,7 +326,7 @@ public:
 					}
 				}
 			}
-			else
+			else if (parallel)
 			{
 				for (int xi = 0; xi < dc; xi++)
 				{
@@ -298,6 +335,17 @@ public:
 					std::pair<AC, AC> cost;
 					f.template fillCache<true, false>(c, x, y, cost, beta);
 					auctionBidding<true>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
+				}
+			}
+			else
+			{
+				for (int xi = 0; xi < dc; xi++)
+				{
+					int x = deferred[xi];
+					std::pair<int, int> y(-1, -1);
+					std::pair<AC, AC> cost;
+					f.template fillCache<false, false>(c, x, y, cost, beta);
+					auctionBidding<false>(x, y.first, cost, u_count, unassigned, r_count, receiving, B, Block);
 				}
 			}
 		}
@@ -319,7 +367,7 @@ public:
 #ifdef DEFER_MISS
 		int &d_count, std::vector<int> &deferred,
 #endif
-		int target_size, bool update)
+		int target_size)
 	{
 		std::swap(unassigned[0], unassigned[1]);
 		u_count[1] = u_count[0];
@@ -330,27 +378,46 @@ public:
 		d_count = 0;
 #endif
 
+		if (parallel)
+		{
 #ifdef DEFER_MISS
 #pragma omp parallel for
 #else
 #pragma omp parallel for schedule(dynamic)
 #endif
-		for (int xi = 0; xi < uc; xi++)
-		{
-			int x = unassigned[1][xi];
-			std::pair<int, int> y;
-			std::pair<AC, AC> cost;
-#ifdef DEFER_MISS
-			if (f.template findBid<false>(c, x, y, cost, beta)) coupling[x] = y.first;
-			else
+			for (int xi = 0; xi < uc; xi++)
 			{
+				int x = unassigned[1][xi];
+				std::pair<int, int> y;
+				std::pair<AC, AC> cost;
+#ifdef DEFER_MISS
+				if (f.template findBid<false>(c, x, y, cost, beta)) coupling[x] = y.first;
+				else
+				{
 #pragma omp critical
-				enqueue(x, d_count, deferred);
-			}
+					enqueue(x, d_count, deferred);
+				}
 #else
-			f.template findBid<false>(c, x, y, cost, beta);
-			auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
+				f.template findBid<false>(c, x, y, cost, beta);
+				auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
 #endif
+			}
+		}
+		else
+		{
+			for (int xi = 0; xi < uc; xi++)
+			{
+				int x = unassigned[1][xi];
+				std::pair<int, int> y;
+				std::pair<AC, AC> cost;
+#ifdef DEFER_MISS
+				if (f.template findBid<false>(c, x, y, cost, beta)) coupling[x] = y.first;
+				else enqueue(x, d_count, deferred);
+#else
+				f.template findBid<false>(c, x, y, cost, beta);
+				auctionBidding<false>(x, y, cost, u_count, unassigned, r_count, receiving, B, Block);
+#endif
+			}
 		}
 
 #ifdef DEFER_MISS
@@ -362,7 +429,7 @@ public:
 #endif
 		if (dc > 0)
 		{
-			if ((5 * dc >= 4 * processor_count) || (dc >= processor_count * 12))
+			if (parallel && ((5 * dc >= 4 * processor_count) || (dc >= processor_count * 12)))
 			{
 #pragma omp parallel
 				{
@@ -377,7 +444,7 @@ public:
 					}
 				}
 			}
-			else
+			else if (parallel)
 			{
 				for (int xi = 0; xi < dc; xi++)
 				{
@@ -388,6 +455,17 @@ public:
 					coupling[x] = y.first;
 				}
 			}
+			else
+			{
+				for (int xi = 0; xi < dc; xi++)
+				{
+					int x = deferred[xi];
+					std::pair<int, int> y(-1, -1);
+					std::pair<AC, AC> cost;
+					f.template fillCache<false, false>(c, x, y, cost, beta);
+					coupling[x] = y.first;
+				}
+			}
 		}
 #endif
 
@@ -395,52 +473,5 @@ public:
 		c.updateBeta(beta, target_size);
 
 		return target_size;
-	}
-
-#if 1
-	template <class COST, class FIND>
-	int auctionMultiple(
-		std::vector<int> &coupling, std::vector<AC> &beta, 
-		COST &c, FIND &f, 
-		std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned, std::vector<std::vector<int>> &unassigned_count,
-		int &r_count, std::vector<int> &receiving,
-		std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block, AC epsilon)
-#else
-	template <class COST, class FIND>
-	int auctionMultiple(
-		std::vector<int> &coupling, std::vector<AC> &beta,
-		COST &c, FIND &f,
-		int &u_count, std::vector<int> &unassigned, std::vector<int> &unassigned_count,
-		int &r_count, std::vector<int> &receiving,
-		std::vector<std::pair<volatile int, volatile AC>> &B, std::vector<std::mutex> &Block, AC epsilon)
-#endif
-	{
-		m_real_pending = 0;
-#if 1
-		std::swap(unassigned[0], unassigned[1]);
-		std::swap(unassigned_count[0], unassigned_count[1]);
-		u_count[1] = u_count[0];
-		u_count[0] = 0;
-		const int uc = u_count[1];
-#else
-		const int uc = u_count;
-#endif
-
-		for (int xi = 0; xi < uc; xi++)
-		{
-			int x = unassigned[1][xi];
-			std::pair<AC, AC> cost;
-			f.template findBid<false>(c, x, m_y[0], cost, beta, coupling);
-			auctionBiddingMultiple<false>(coupling, x, m_y[0], cost, u_count, unassigned, unassigned_count, r_count, receiving, B, Block);
-			auctionBuyingMultiple(coupling, beta, u_count, unassigned, unassigned_count, r_count, receiving, B, epsilon);
-		}
-
-		if (((u_count[0] == 0) && (u_count[0] < m_real_pending)) || (u_count[0] > m_real_pending))
-		{
-			std::cout << "Error: " << u_count[0] << " vs. " << m_real_pending << std::endl;
-			exit(-1);
-		}
-
-		return (int)(coupling.size() - m_real_pending);
 	}
 };

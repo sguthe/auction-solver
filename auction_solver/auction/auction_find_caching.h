@@ -8,11 +8,12 @@
 
 extern int processor_count;
 
-template <class COST, int CACHE, class AC>
+template <class COST, class AC>
 class FindCaching
 {
 protected:
 	int target_size;
+	int CACHE;
 	std::vector<std::vector<int>> m_idx;
 	std::vector<std::vector<AC>> m_heap;
 
@@ -20,7 +21,7 @@ protected:
 	std::vector<std::vector<int>> temp_idx;
 	std::vector<std::vector<AC>> temp_heap;
 public:
-	FindCaching(int target_size, COST &c, std::vector<AC> &beta, bool fill = true) : target_size(target_size)
+	FindCaching(int target_size, COST &c, std::vector<AC> &beta, int CACHE, bool fill = true) : target_size(target_size), CACHE(CACHE)
 	{
 #ifdef DISPLAY_THREAD_FILL
 		thread_fill_count.resize(omp_get_max_threads());

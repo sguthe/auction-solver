@@ -88,6 +88,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -117,6 +118,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -159,7 +161,7 @@
     <ClInclude Include="..\..\..\lap_solver\core\omp\lap_solver.h" />
     <ClInclude Include="..\..\..\lap_solver\core\omp\lap_worksharing.h" />
     <ClInclude Include="..\..\..\lap_solver\lap.h" />
-    <ClInclude Include="..\..\..\lap_solver\test\test_options.h" />
+    <ClInclude Include="..\..\auction\auction_cost_adapter.h" />
     <ClInclude Include="..\..\auction\auction_cost_direct.h" />
     <ClInclude Include="..\..\auction\auction_cost_table.h" />
     <ClInclude Include="..\..\auction\auction_cpu.h" />
@@ -168,6 +170,7 @@
     <ClInclude Include="..\..\auction\auction_heap.h" />
     <ClInclude Include="..\..\auction\auction_helper.h" />
     <ClInclude Include="..\..\auction\auction_one_way.h" />
+    <ClInclude Include="..\..\test\test_options.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
