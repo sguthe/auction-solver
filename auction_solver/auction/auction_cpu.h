@@ -196,17 +196,17 @@ AC auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AC> &
 			if (epsilon != 0.0f)
 			{
 #ifdef DEFER_MISS
-				completed = auction.auction<false>(coupling, beta, c, f, u_count, unassigned, d_count, deferred, r_count, receiving, B, Block, target_size, epsilon, parallel);
+				completed = auction.template auction<false>(coupling, beta, c, f, u_count, unassigned, d_count, deferred, r_count, receiving, B, Block, target_size, epsilon, parallel);
 #else
-				completed = auction.auction<false>(coupling, beta, c, f, u_count, unassigned, r_count, receiving, B, Block, target_size, epsilon, parallel);
+				completed = auction.template auction<false>(coupling, beta, c, f, u_count, unassigned, r_count, receiving, B, Block, target_size, epsilon, parallel);
 #endif
 			}
 			else
 			{
 #ifdef DEFER_MISS
-				completed = auction.auction<true>(coupling, beta, c, f, u_count, unassigned, d_count, deferred, r_count, receiving, B, Block, target_size, epsilon, parallel);
+				completed = auction.template auction<true>(coupling, beta, c, f, u_count, unassigned, d_count, deferred, r_count, receiving, B, Block, target_size, epsilon, parallel);
 #else
-				completed = auction.auction<true>(coupling, beta, c, f, u_count, unassigned, r_count, receiving, B, Block, target_size, epsilon, parallel);
+				completed = auction.template auction<true>(coupling, beta, c, f, u_count, unassigned, r_count, receiving, B, Block, target_size, epsilon, parallel);
 #endif
 			}
 
