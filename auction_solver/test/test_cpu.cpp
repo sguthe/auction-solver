@@ -177,7 +177,6 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 			}
 			else if (caching) std::cout << " width caching";
 			std::cout << std::endl;
-			std::cout << std::endl;
 
 			auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -544,116 +543,109 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				long long entries = (max_tab * max_tab) / N2;
 
 				C eps_factor = C(0.125);
+				int N = std::max(N1, N2);
 
-				if (omp)
+				std::vector<int> coupling(N);
+				std::vector<C> beta;
+				int cache_size = (int)ceil(sqrt((double)entries));
+
+				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+
+				if (N1 <= entries)
 				{
-#ifdef LAP_OPENMP
-					lap::omp::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-					lap::omp::Worksharing ws(N2, costFunction.getMultiple());
+					std::cout << "using table with " << N1 << " rows." << std::endl;
 
-					if (N1 <= entries)
+					lap::TableCost<C> costMatrix(N, costFunction);
+					lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N, N, costMatrix);
+					AdaptorCost<C, lap::DirectIterator<C, C, lap::TableCost<C>>> adaptor(iterator, N);
+
+					if (epsilon) costMatrix.setInitialEpsilon(eps_factor);
+
+					lap::displayTime(start_time, "setup complete", std::cout);
+					C cost(0);
+					if (caching)
 					{
-						std::cout << "using table with " << N1 << " rows." << std::endl;
-
-						lap::omp::TableCost<C> costMatrix(N1, N2, costFunction, ws);
-						lap::omp::DirectIterator<C, C, decltype(costMatrix)> iterator(N1, N2, costMatrix, ws);
-						if (epsilon) costMatrix.setInitialEpsilon(eps_factor);
-
-						lap::displayTime(start_time, "setup complete", std::cout);
-
-						lap::omp::solve<C>(N1, N2, costMatrix, iterator, rowsol);
-
+						FindCaching<AdaptorCost<C, lap::DirectIterator<C, C, lap::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
+						cost = auctionSingle<C>(coupling, adaptor, f, beta, epsilon, [&]()
 						{
-							std::stringstream ss;
-							ss << "cost = " << lap::omp::cost<C, C>(N1, N2, costMatrix, rowsol);
-							lap::displayTime(start_time, ss.str().c_str(), std::cout);
-						}
+#pragma omp parallel for
+							for (int x = 0; x < N; x++)
+							{
+								// slack...
+								if (coupling[x] != -1) rowsol[coupling[x]] = x;
+							}
+							C cost = getCurrentCost<C>(rowsol, adaptor, N);
+							return cost;
+						}, omp);
 					}
 					else
 					{
-						std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
-
-						if (4 * entries < N1)
+						FindLinear<AdaptorCost<C, lap::DirectIterator<C, C, lap::TableCost<C>>>, C> f(N);
+						cost = auctionSingle<C>(coupling, adaptor, f, beta, epsilon, [&]()
 						{
-							lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, (int)entries, costFunction, ws);
-							if (epsilon) costFunction.setInitialEpsilon(eps_factor);
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::omp::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
+#pragma omp parallel for
+							for (int x = 0; x < N; x++)
 							{
-								std::stringstream ss;
-								ss << "cost = " << lap::omp::cost<C, C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
+								// slack...
+								if (coupling[x] != -1) rowsol[coupling[x]] = x;
 							}
-						}
-						else
-						{
-							lap::omp::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, (int)entries, costFunction, ws);
-							if (epsilon) costFunction.setInitialEpsilon(eps_factor);
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::omp::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
-							{
-								std::stringstream ss;
-								ss << "cost = " << lap::omp::cost<C, C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
-							}
-						}
+							C cost = getCurrentCost<C>(rowsol, adaptor, N);
+							return cost;
+						}, omp);
 					}
-#endif
+
+					{
+						std::stringstream ss;
+						ss << "cost = " << cost;
+						lap::displayTime(start_time, ss.str().c_str(), std::cout);
+					}
 				}
 				else
 				{
-					lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+					std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
 
-					if (N1 <= entries)
+					C cost(0);
+
+					SafeCachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N, N, (int)entries, costFunction);
+					AdaptorCost<C, SafeCachingIterator<C, C, decltype(costFunction), lap::CacheSLRU>> adaptor(iterator, N);
+					if (epsilon) costFunction.setInitialEpsilon(eps_factor);
+					lap::displayTime(start_time, "setup complete", std::cout);
+
+					if (caching)
 					{
-						std::cout << "using table with " << N1 << " rows." << std::endl;
-
-						lap::TableCost<C> costMatrix(N1, N2, costFunction);
-						lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N1, N2, costMatrix);
-						if (epsilon) costMatrix.setInitialEpsilon(eps_factor);
-
-						lap::displayTime(start_time, "setup complete", std::cout);
-
-						lap::solve<C>(N1, N2, costMatrix, iterator, rowsol);
-
+						FindCaching<AdaptorCost<C, SafeCachingIterator<C, C, decltype(costFunction), lap::CacheSLRU>>, C> f(N, adaptor, beta, cache_size);
+						cost = auctionSingle<C>(coupling, adaptor, f, beta, epsilon, [&]()
 						{
-							std::stringstream ss;
-							ss << "cost = " << lap::cost<C, C>(N1, N2, costMatrix, rowsol);
-							lap::displayTime(start_time, ss.str().c_str(), std::cout);
-						}
+#pragma omp parallel for
+							for (int x = 0; x < N; x++)
+							{
+								// slack...
+								if (coupling[x] != -1) rowsol[coupling[x]] = x;
+							}
+							C cost = getCurrentCost<C>(rowsol, adaptor, N);
+							return cost;
+						}, omp);
 					}
 					else
 					{
-						std::cout << "using caching with " << entries << "/" << N1 << " entries." << std::endl;
-
-						if (4 * entries < N1)
+						FindLinear<AdaptorCost<C, SafeCachingIterator<C, C, decltype(costFunction), lap::CacheSLRU>>, C> f(N);
+						cost = auctionSingle<C>(coupling, adaptor, f, beta, epsilon, [&]()
 						{
-							lap::CachingIterator<C, C, decltype(costFunction), lap::CacheSLRU> iterator(N1, N2, (int)entries, costFunction);
-							if (epsilon) costFunction.setInitialEpsilon(eps_factor);
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::solve<C>(N1, N2, costFunction, iterator, rowsol);
-
+#pragma omp parallel for
+							for (int x = 0; x < N; x++)
 							{
-								std::stringstream ss;
-								ss << "cost = " << lap::cost<C, C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
+								// slack...
+								if (coupling[x] != -1) rowsol[coupling[x]] = x;
 							}
-						}
-						else
-						{
-							lap::CachingIterator<C, C, decltype(costFunction), lap::CacheLFU> iterator(N1, N2, (int)entries, costFunction);
-							if (epsilon) costFunction.setInitialEpsilon(eps_factor);
-							lap::displayTime(start_time, "setup complete", std::cout);
-							lap::solve<C>(N1, N2, costFunction, iterator, rowsol);
+							C cost = getCurrentCost<C>(rowsol, adaptor, N);
+							return cost;
+						}, omp);
+					}
 
-							{
-								std::stringstream ss;
-								ss << "cost = " << lap::cost<C, C>(N1, N2, costFunction, rowsol);
-								lap::displayTime(start_time, ss.str().c_str(), std::cout);
-							}
-						}
+					{
+						std::stringstream ss;
+						ss << "cost = " << cost;
+						lap::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 				}
 			}
