@@ -150,7 +150,9 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool c
 		{
 			int N = (int)floor(sqrt((double)NN));
 
-			std::cout << "Random<" << name_C << "> " << N << "x" << N;
+			if (sanity) std::cout << "Sanity";
+			else std::cout << "Random";
+			std::cout << "<" << name_C << "> " << N << "x" << N;
 			if (omp) std::cout << " multithreaded";
 			if (epsilon)
 			{
