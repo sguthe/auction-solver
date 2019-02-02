@@ -17,7 +17,6 @@ protected:
 	std::vector<std::vector<int>> m_idx;
 	std::vector<std::vector<AC>> m_heap;
 
-//	std::vector<AC> temp_cost;
 	std::vector<std::vector<int>> temp_idx;
 	std::vector<std::vector<AC>> temp_heap;
 public:
@@ -26,7 +25,6 @@ public:
 #ifdef DISPLAY_THREAD_FILL
 		thread_fill_count.resize(omp_get_max_threads());
 #endif
-		//temp_cost.resize(target_size);
 		temp_idx.resize(processor_count);
 		temp_heap.resize(processor_count);
 		for (int x = 0; x < processor_count; x++)
@@ -44,26 +42,22 @@ public:
 		}
 		if (fill)
 		{
-			bool hacky_hack = false;
-			if (beta.size() == 0)
+			bool remove_beta = false;
+			if (beta.size() < target_size)
 			{
 				beta.resize(target_size);
 				for (int x = 0; x < target_size; x++) beta[x] = AC(0.0);
-				hacky_hack = true;
+				remove_beta = true;
 			}
-#pragma omp parallel
+#pragma omp parallel for schedule(dynamic)
+			for (int x = 0; x < target_size; x++)
 			{
-				int t = omp_get_thread_num();
-#pragma omp for schedule(dynamic)
-				for (int x = 0; x < target_size; x++)
-				{
-					std::pair<int, int> y;
-					std::pair<AC, AC> cost;
-					fillCache<false, true>(c, x, y, cost, beta);
-				}
+				std::pair<int, int> y;
+				std::pair<AC, AC> cost;
+				fillCache<false, true>(c, x, y, cost, beta);
 			}
 			c.printCases(true);
-			if (hacky_hack) beta.resize(0);
+			if (remove_beta) beta.resize(0);
 		}
 	}
 
@@ -83,7 +77,6 @@ public:
 			}
 			mod = sqrtf(heap[CACHE]) - sqrtf(mod);
 			heap[CACHE] = mod * mod;
-			//heap[CACHE] = -1.0e36f;
 		}
 	}
 
