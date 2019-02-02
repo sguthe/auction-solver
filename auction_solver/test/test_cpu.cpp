@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
 }
 
 template <class C, class M, class TP>
-void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &start_time)
+void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &start_time, bool sanity = false)
 {
 	C eps;
 	int *rowsol = new int[N];
@@ -134,6 +134,22 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 	{
 		std::stringstream ss;
 		ss << "cost = " << cost;
+		lap::displayTime(start_time, ss.str().c_str(), std::cout);
+	}
+
+	if (sanity)
+	{
+		bool passed = true;
+		for (long long i = 0; (passed) && (i < N); i++)
+		{
+			passed &= (rowsol[i] == i);
+		}
+		std::stringstream ss;
+		if (passed) ss << "test passed: ";
+		else ss << "test failed: ";
+		C real_cost(0);
+		for (int i = 0; i < N; i++) real_cost += adaptor.getCost(i, i);
+		ss << "ground truth cost = " << real_cost;
 		lap::displayTime(start_time, ss.str().c_str(), std::cout);
 	}
 
@@ -206,7 +222,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool c
 
 			lap::TableCost<C> costMatrix(N, N, tab);
 
-			testMatrix<C>(N, costMatrix, omp, caching, epsilon, start_time);
+			testMatrix<C>(N, costMatrix, omp, caching, epsilon, start_time, sanity);
 
 			delete[] tab;
 		}
