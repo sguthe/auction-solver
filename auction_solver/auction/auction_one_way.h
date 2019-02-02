@@ -6,10 +6,10 @@
 
 extern int processor_count;
 
-#define BUYING_THREAD_COUNT 1
-#define BIDDING_THREAD_COUNT 1
-//#define BUYING_THREAD_COUNT (processor_count >> 2)
-//#define BIDDING_THREAD_COUNT (processor_count >> 2)
+//#define BUYING_THREAD_COUNT 1
+//#define BIDDING_THREAD_COUNT 1
+#define BUYING_THREAD_COUNT (processor_count >> 2)
+#define BIDDING_THREAD_COUNT (processor_count >> 2)
 
 template <class AC>
 class AuctionOneWay
