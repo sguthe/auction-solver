@@ -195,7 +195,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool c
 					for (int i = 0; i < N; i++)
 					{
 						int j;
-						int ii = i * N;
+						long long ii = (long long)i * (long long)N;
 						for (j = 0; j < i; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
 						tab[ii + i] = vec[i] + vec[i + N];
 						for (j = i + 1; j < N; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
@@ -207,7 +207,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool c
 					for (int i = 0; i < N; i++)
 					{
 						int j;
-						int ii = i * N;
+						long long ii = (long long)i * (long long)N;
 						for (j = 0; j < i; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
 						tab[ii + i] = vec[i] + vec[i + N];
 						for (j = i + 1; j < N; j++) tab[ii + j] = vec[i] + vec[j + N] + C(0.1);
