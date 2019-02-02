@@ -43,7 +43,7 @@ public:
 		if (fill)
 		{
 			bool remove_beta = false;
-			if (beta.size() < target_size)
+			if (beta.size() < (size_t)target_size)
 			{
 				beta.resize(target_size);
 				for (int x = 0; x < target_size; x++) beta[x] = AC(0.0);
