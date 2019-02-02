@@ -264,7 +264,7 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				}
 
 				// cost function
-				auto get_cost = [vec, N, rank](int x, int y) -> C
+				auto get_cost = [&vec, &N, &rank](int x, int y) -> C
 				{
 					C sum(0);
 					for (long long k = 0; k < rank; k++)
@@ -338,7 +338,7 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 			}
 
 			// cost function
-			auto get_cost = [tab_s, tab_t](int x, int y) -> C
+			auto get_cost = [&tab_s, &tab_t](int x, int y) -> C
 			{
 				int xx = x + x;
 				int yy = y + y;
