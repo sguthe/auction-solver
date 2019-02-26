@@ -6,6 +6,9 @@
 //#define LAP_DEBUG
 //#define LAP_NO_MEM_DEBUG
 //#define LAP_ROWS_SCANNED
+
+//#define RANDOM_SEED 1234
+
 #include "../../lap_solver/lap.h"
 #include "../auction/auction_cpu.h"
 #include "../auction/auction_cost_adapter.h"
@@ -95,7 +98,8 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 	if (epsilon) costMatrix.setInitialEpsilon(eps = (lap::guessEpsilon<C>(N, N, iterator) / C(1000.0)));
 	std::vector<int> coupling(N);
 	std::vector<C> beta;
-	int cache_size = (int)ceil(sqrt((double)N));
+//	int cache_size = (int)ceil(sqrt((double)N));
+	int cache_size = (int)ceil(sqrt((double)N / 10.0));
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -181,7 +185,12 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool c
 			auto start_time = std::chrono::high_resolution_clock::now();
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			C *tab = new C[NN];
 			if (sanity)
@@ -254,7 +263,12 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 				auto start_time = std::chrono::high_resolution_clock::now();
 
 				std::uniform_real_distribution<C> distribution(0.0, 1.0);
-				std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+				std::mt19937_64 generator(RANDOM_SEED);
+#else
+				std::random_device rd;
+				std::mt19937_64 generator(rd());
+#endif
 
 				// The following matrix will have at most the seletcted rank.
 				C *vec = new C[N * rank];
@@ -309,7 +323,12 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 			auto start_time = std::chrono::high_resolution_clock::now();
 
 			std::uniform_real_distribution<C> distribution(0.0, 1.0);
-			std::mt19937_64 generator(1234);
+#ifdef RANDOM_SEED
+			std::mt19937_64 generator(RANDOM_SEED);
+#else
+			std::random_device rd;
+			std::mt19937_64 generator(rd());
+#endif
 
 			C *tab_s = new C[2 * N];
 			C *tab_t = new C[2 * N];
@@ -450,7 +469,8 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				std::vector<int> coupling(N);
 				std::vector<C> beta;
-				int cache_size = (int)ceil(sqrt((double)entries));
+//				int cache_size = (int)ceil(sqrt((double)entries));
+				int cache_size = (int)ceil(sqrt((double)entries / 10.0));
 
 				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
 
