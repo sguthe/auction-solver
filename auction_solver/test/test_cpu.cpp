@@ -111,16 +111,14 @@ TC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1)
 template <class C, class M, class TP>
 void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &start_time, bool sanity = false)
 {
-	C eps;
+	C eps = C(0);
 	int *rowsol = new int[N];
 	lap::DirectIterator<C, C, M> iterator(N, N, costMatrix);
 	AdaptorCost<C, lap::DirectIterator<C, C, M>> adaptor(iterator, N);
 
-	//if (epsilon) costMatrix.setInitialEpsilon(eps = (lap::guessEpsilon<C>(N, N, iterator) / C(1000.0)));
 	if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 	std::vector<int> coupling(N);
 	std::vector<C> beta;
-//	int cache_size = (int)ceil(sqrt((double)N));
 	int cache_size = (int)ceil(sqrt((double)N / 10.0));
 
 	lap::displayTime(start_time, "setup complete", std::cout);
@@ -486,12 +484,11 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				long long entries = (max_tab * max_tab) / N2;
 
-				C eps_factor = C(0.125);
+				C eps = C(0);
 				int N = std::max(N1, N2);
 
 				std::vector<int> coupling(N);
 				std::vector<C> beta;
-//				int cache_size = (int)ceil(sqrt((double)entries));
 				int cache_size = (int)ceil(sqrt((double)entries / 10.0));
 
 				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
@@ -504,14 +501,14 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					lap::DirectIterator<C, C, decltype(costMatrix)> iterator(N, N, costMatrix);
 					AdaptorCost<C, lap::DirectIterator<C, C, lap::TableCost<C>>> adaptor(iterator, N);
 
-					//if (epsilon) costMatrix.setInitialEpsilon(eps_factor);
+					if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 
 					lap::displayTime(start_time, "setup complete", std::cout);
 					C cost(0);
 					if (caching)
 					{
 						FindCaching<AdaptorCost<C, lap::DirectIterator<C, C, lap::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
-						cost = auctionSingle<C>(coupling, adaptor, f, beta, epsilon, [&]()
+						cost = auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
 						{
 #pragma omp parallel for
 							for (int x = 0; x < N; x++)
@@ -526,7 +523,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					else
 					{
 						FindLinear<AdaptorCost<C, lap::DirectIterator<C, C, lap::TableCost<C>>>, C> f(N);
-						cost = auctionSingle<C>(coupling, adaptor, f, beta, epsilon, [&]()
+						cost = auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
 						{
 #pragma omp parallel for
 							for (int x = 0; x < N; x++)
