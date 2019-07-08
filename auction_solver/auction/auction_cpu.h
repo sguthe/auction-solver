@@ -109,8 +109,7 @@ AC auctionSingle(std::vector<int> &coupling, COST &c, FIND &f, std::vector<AC> &
 #ifndef LAP_QUIET
 	int elapsed = 0;
 #endif
-	AC epsilon_lower = epsilon / AC(25 * target_size);
-	epsilon *= AC(25);
+	AC epsilon_lower = epsilon / AC(1000 * target_size);
 	int iteration = 0;
 
 	AuctionOneWay<AC> auction;
