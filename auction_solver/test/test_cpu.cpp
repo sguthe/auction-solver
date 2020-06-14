@@ -119,7 +119,7 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 	if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 	std::vector<int> coupling(N);
 	std::vector<C> beta;
-	int cache_size = (int)ceil(sqrt((double)N / 10.0));
+	int cache_size = 3;// (int)ceil(sqrt((double)N / 10.0));
 
 	lap::displayTime(start_time, "setup complete", std::cout);
 
@@ -489,7 +489,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				std::vector<int> coupling(N);
 				std::vector<C> beta;
-				int cache_size = (int)ceil(sqrt((double)entries / 10.0));
+				int cache_size = 3;// (int)ceil(sqrt((double)entries / 10.0));
 
 				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
 
