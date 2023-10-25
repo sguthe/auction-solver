@@ -17,7 +17,7 @@ doi: https://dl.acm.org/doi/abs/10.1145/3442348
 # Linux
 
 This section contains the instructions for building and running under
-Linux. For Windows, refer below.
+Linux. For Windows, see below.
 
 ## Requirements
 
