@@ -72,8 +72,8 @@ Linux. For Windows, the relative path is different
 (`../../../../../images/`, when executing in the build directory).
 
 - Table 2:\
-    `./auction_cpu -table_min 1000 -table_max 128000 -random -geometric -geometric_disjoint -sanity -double -epsilon -caching -omp`
-    `./auction_cpu -table_min 1000 -table_max 64000 -random -geometric -geometric_disjoint -sanity -double -epsilon -omp`
+    `./test_cpu -table_min 1000 -table_max 128000 -random -geometric -geometric_disjoint -sanity -double -epsilon -caching -omp`\
+    `./test_cpu -table_min 1000 -table_max 64000 -random -geometric -geometric_disjoint -sanity -double -epsilon -omp`
 
 # Own Project
 
