@@ -9,9 +9,7 @@
 
 //#define RANDOM_SEED 1234
 
-#include "../../lap_solver/lap.h"
-#include "../core/auction_cpu.h"
-#include "../core/auction_cost_adapter.h"
+#include "../auction.h"
 
 #include <random>
 #include <string>
@@ -113,21 +111,21 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 {
 	C eps = C(0);
 	int *rowsol = new int[N];
-	lap::DirectIterator<C, M> iterator(costMatrix);
-	AdaptorCost<C, lap::DirectIterator<C, M>> adaptor(iterator, N);
+	auction::DirectIterator<C, M> iterator(costMatrix);
+  auction::AdaptorCost<C, auction::DirectIterator<C, M>> adaptor(iterator, N);
 
 	if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 	std::vector<int> coupling(N);
 	std::vector<C> beta;
 	int cache_size = 3;// (int)ceil(sqrt((double)N / 10.0));
 
-	lap::displayTime(start_time, "setup complete", std::cout);
+	auction::displayTime(start_time, "setup complete", std::cout);
 
 	C cost(0);
 	if (caching)
 	{
-		FindCaching<AdaptorCost<C, lap::DirectIterator<C, M>>, C> f(N, adaptor, beta, cache_size);
-		cost = auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+    auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N, adaptor, beta, cache_size);
+		cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
 		{
 #pragma omp parallel for
 			for (int x = 0; x < N; x++)
@@ -135,14 +133,14 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 				// slack...
 				if (coupling[x] != -1) rowsol[coupling[x]] = x;
 			}
-			C cost = getCurrentCost<C>(rowsol, adaptor, N);
+			C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
 			return cost;
 		}, omp);
 	}
 	else
 	{
-		FindLinear<AdaptorCost<C, lap::DirectIterator<C, M>>, C> f(N);
-		cost = auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+    auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N);
+		cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
 		{
 #pragma omp parallel for
 			for (int x = 0; x < N; x++)
@@ -150,7 +148,7 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 				// slack...
 				if (coupling[x] != -1) rowsol[coupling[x]] = x;
 			}
-			C cost = getCurrentCost<C>(rowsol, adaptor, N);
+			C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
 			return cost;
 		}, omp);
 	}
@@ -158,7 +156,7 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 	{
 		std::stringstream ss;
 		ss << "cost = " << cost;
-		lap::displayTime(start_time, ss.str().c_str(), std::cout);
+		auction::displayTime(start_time, ss.str().c_str(), std::cout);
 	}
 
 	if (sanity)
@@ -174,7 +172,7 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 		C real_cost(0);
 		for (int i = 0; i < N; i++) real_cost += adaptor.getCost(i, i);
 		ss << "ground truth cost = " << real_cost;
-		lap::displayTime(start_time, ss.str().c_str(), std::cout);
+		auction::displayTime(start_time, ss.str().c_str(), std::cout);
 	}
 
 	delete[] rowsol;
@@ -249,7 +247,7 @@ void testRandom(long long min_tab, long long max_tab, int runs, bool omp, bool c
 				for (long long i = 0; i < NN; i++) tab[i] = distribution(generator);
 			}
 
-			lap::TableCost<C> costMatrix(N, N, tab);
+			auction::TableCost<C> costMatrix(N, N, tab);
 
 			testMatrix<C>(N, costMatrix, omp, caching, epsilon, start_time, sanity);
 
@@ -308,8 +306,8 @@ void testRandomLowRank(long long min_tab, long long max_tab, long long min_rank,
 					return sum / C(rank);
 				};
 
-				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-				lap::TableCost<C> costMatrix(N, N, costFunction);
+				auction::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+				auction::TableCost<C> costMatrix(N, N, costFunction);
 				delete[] vec;
 
 				testMatrix<C>(N, costMatrix, omp, caching, epsilon, start_time);
@@ -386,8 +384,8 @@ void testGeometric(long long min_tab, long long max_tab, int runs, bool omp, boo
 				return d0 * d0 + d1 * d1;
 			};
 
-			lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
-			lap::TableCost<C> costMatrix(N, costFunction);
+			auction::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+			auction::TableCost<C> costMatrix(N, costFunction);
 
 			testMatrix<C>(N, costMatrix, omp, caching, epsilon, start_time);
 		}
@@ -491,24 +489,24 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 				std::vector<C> beta;
 				int cache_size = 3;// (int)ceil(sqrt((double)entries / 10.0));
 
-				lap::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
+				auction::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
 
 				if (N1 <= entries)
 				{
 					std::cout << "using table with " << N1 << " rows." << std::endl;
 
-					lap::TableCost<C> costMatrix(N, costFunction);
-					lap::DirectIterator<C, decltype(costMatrix)> iterator(costMatrix);
-					AdaptorCost<C, lap::DirectIterator<C, lap::TableCost<C>>> adaptor(iterator, N);
+					auction::TableCost<C> costMatrix(N, costFunction);
+					auction::DirectIterator<C, decltype(costMatrix)> iterator(costMatrix);
+          auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>> adaptor(iterator, N);
 
 					if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 
-					lap::displayTime(start_time, "setup complete", std::cout);
+					auction::displayTime(start_time, "setup complete", std::cout);
 					C cost(0);
 					if (caching)
 					{
-						FindCaching<AdaptorCost<C, lap::DirectIterator<C, lap::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
-						cost = auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+            auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
+						cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
 						{
 #pragma omp parallel for
 							for (int x = 0; x < N; x++)
@@ -516,14 +514,14 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 								// slack...
 								if (coupling[x] != -1) rowsol[coupling[x]] = x;
 							}
-							C cost = getCurrentCost<C>(rowsol, adaptor, N);
+							C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
 							return cost;
 						}, omp);
 					}
 					else
 					{
-						FindLinear<AdaptorCost<C, lap::DirectIterator<C, lap::TableCost<C>>>, C> f(N);
-						cost = auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+            auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N);
+						cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
 						{
 #pragma omp parallel for
 							for (int x = 0; x < N; x++)
@@ -531,7 +529,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 								// slack...
 								if (coupling[x] != -1) rowsol[coupling[x]] = x;
 							}
-							C cost = getCurrentCost<C>(rowsol, adaptor, N);
+							C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
 							return cost;
 						}, omp);
 					}
@@ -539,7 +537,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					{
 						std::stringstream ss;
 						ss << "cost = " << cost;
-						lap::displayTime(start_time, ss.str().c_str(), std::cout);
+						auction::displayTime(start_time, ss.str().c_str(), std::cout);
 					}
 				}
 				else
