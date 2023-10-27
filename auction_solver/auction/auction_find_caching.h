@@ -6,6 +6,10 @@
 #include "auction_helper.h"
 #include "auction_heap.h"
 
+#ifdef LAP_OPENMP
+#  include <omp.h>
+#endif
+
 extern int processor_count;
 
 template <class COST, class AC>
@@ -23,7 +27,11 @@ public:
 	FindCaching(int target_size, COST &c, std::vector<AC> &beta, int CACHE, bool fill = true) : target_size(target_size), CACHE(CACHE)
 	{
 #ifdef DISPLAY_THREAD_FILL
+#  ifdef LAP_OPENMP
 		thread_fill_count.resize(omp_get_max_threads());
+#  else
+    thread_fill_count.resize(1);
+#  endif
 #endif
 		temp_idx.resize(processor_count);
 		temp_heap.resize(processor_count);
@@ -63,7 +71,9 @@ public:
 
 	void recreate(COST &c, float *linear_target)
 	{
+#ifdef LAP_OPENMP
 		omp_set_num_threads(processor_count);
+#endif
 #pragma omp parallel for
 		for (int x = 0; x < target_size; x++)
 		{
@@ -90,7 +100,11 @@ public:
 		std::vector<AC> &heap = m_heap[x];
 
 #ifdef DISPLAY_THREAD_FILL
+#  ifdef LAP_OPENMP
 		thread_fill_count[omp_get_thread_num()]++;
+#  else
+    thread_fill_count[0]++;
+#  endif
 #endif
 
 		AC limit = MAX_COST;
@@ -102,7 +116,11 @@ public:
 			{
 				if (ccost <= limit)
 				{
+#ifdef LAP_OPENMP
 					int p = omp_get_thread_num();
+#else
+          int p = 0;
+#endif
 					if (NN[p] < CACHE + 1)
 					{
 						heap_insert(temp_heap[p], temp_idx[p], NN[p], ccost, yy);

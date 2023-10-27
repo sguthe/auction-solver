@@ -200,8 +200,13 @@ private:
 public:
 	AuctionOneWay()
 	{
+#ifdef LAP_OPENMP
 		m_y.resize(omp_get_max_threads());
 		m_cost.resize(omp_get_max_threads());
+#else
+    m_y.resize(1);
+    m_cost.resize(1);
+#endif
 		m_real_pending = 0;
 	}
 
