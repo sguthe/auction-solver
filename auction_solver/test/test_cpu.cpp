@@ -10,8 +10,8 @@
 //#define RANDOM_SEED 1234
 
 #include "../../lap_solver/lap.h"
-#include "../auction/auction_cpu.h"
-#include "../auction/auction_cost_adapter.h"
+#include "../core/auction_cpu.h"
+#include "../core/auction_cost_adapter.h"
 
 #include <random>
 #include <string>
