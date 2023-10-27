@@ -3,7 +3,9 @@
 #include <tuple>
 #include <vector>
 #include <thread>
-#include <omp.h>
+#ifdef LAP_OPENMP
+#  include <omp.h>
+#endif
 #include "auction_heap.h"
 
 template <class COST, class AC>

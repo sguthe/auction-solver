@@ -2,7 +2,9 @@
 
 #include "auction_helper.h"
 #include <mutex>
-#include <omp.h>
+#ifdef LAP_OPENMP
+#  include <omp.h>
+#endif
 
 extern int processor_count;
 

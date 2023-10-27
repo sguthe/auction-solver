@@ -2,7 +2,9 @@
 
 #include "auction_helper.h"
 
-#include <omp.h>
+#ifdef LAP_OPENMP
+#  include <omp.h>
+#endif
 
 template <class AC, class IT>
 class AdaptorCost

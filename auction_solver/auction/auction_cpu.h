@@ -19,7 +19,9 @@
 
 #include "auction_one_way.h"
 
-#include <omp.h>
+#ifdef LAP_OPENMP
+#  include <omp.h>
+#endif
 
 #ifdef DISPLAY_MISS
 long long hit_count = 0;
