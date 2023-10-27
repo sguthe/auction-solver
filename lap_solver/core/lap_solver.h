@@ -45,20 +45,6 @@ namespace lap
 	public:
 		AllocationLogger()
 		{
-#ifdef LAP_CUDA
-			allocated.resize(3);
-			size.resize(3);
-			alloc_file.resize(3);
-			alloc_line.resize(3);
-			peak.resize(3);
-			current.resize(3);
-			name.resize(3);
-			peak[0] = 0ull; peak[1] = 0ull; peak[2] = 0ull;
-			current[0] = 0ull; current[1] = 0ull; current[2] = 0ull;
-			name[0] = std::string("system memory");
-			name[1] = std::string("pinned memory");
-			name[2] = std::string("device memory");
-#else
 			allocated.resize(1);
 			size.resize(1);
 			alloc_file.resize(1);
@@ -69,7 +55,6 @@ namespace lap
 			peak[0] = 0ull;
 			current[0] = 0ull;
 			name[0] = std::string("memory");
-#endif
 		}
 
 		~AllocationLogger() {}

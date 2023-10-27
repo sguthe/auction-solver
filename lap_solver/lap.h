@@ -29,24 +29,6 @@
 #define lapFree lap::free
 #endif
 
-#ifdef LAP_CUDA
-#ifndef lapAllocPinned
-#define lapAllocPinned lap::cuda::allocPinned
-#endif
-
-#ifndef lapFreePinned
-#define lapFreePinned lap::cuda::freePinned
-#endif
-
-#ifndef lapAllocDevice
-#define lapAllocDevice lap::cuda::allocDevice
-#endif
-
-#ifndef lapFreeDevice
-#define lapFreeDevice lap::cuda::freeDevice
-#endif
-#endif
-
 #include <tuple>
 
 namespace lap
@@ -94,21 +76,6 @@ namespace lap
 
 	}
 #endif
-
-#ifdef LAP_CUDA
-	namespace cuda
-	{
-		// Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-		template <class SC, class TC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-		template <class SC, class TC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-		template <class SC, class TC, class CF> SC cost(int dim, CF &costfunc, int *rowsol, cudaStream_t stream);
-		template <class SC, class TC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol, cudaStream_t stream);
-
-		// Iterator classes used for accessing the cost functions
-		template <class TC, class CF> class DirectIterator;
-		template <class TC, class CF, class CACHE> class CachingIterator;
-	}
-#endif
 }
 
 #include "core/lap_cost.h"
@@ -123,13 +90,4 @@ namespace lap
 #include "core/omp/lap_direct_iterator.h"
 #include "core/omp/lap_caching_iterator.h"
 #include "core/omp/lap_solver.h"
-#endif
-
-#ifdef LAP_CUDA
-#include "core/cuda/lap_cuda_helper.h"
-#include "core/cuda/lap_solver.h"
-#include "core/cuda/lap_cost.h"
-#include "core/cuda/lap_cache.h"
-#include "core/cuda/lap_direct_iterator.h"
-#include "core/cuda/lap_caching_iterator.h"
 #endif
