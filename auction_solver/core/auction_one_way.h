@@ -362,10 +362,10 @@ namespace auction
       }
 #endif
 
-      int modified = r_count;
+      //int modified = r_count;
       auctionBuying<EXACT>(coupling, beta, u_count, unassigned, r_count, receiving, B, epsilon);
       // always required
-      c.updateBeta(beta, modified);
+      //c.updateBeta(beta, modified);
 
       return target_size - u_count[0];
     }

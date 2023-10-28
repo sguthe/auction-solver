@@ -62,7 +62,7 @@ namespace auction
             cost.second = ccost;
           }
         }
-      }, x, cost.second, beta);
+      }, x, target_size, cost.second, beta);
       return true;
     }
     // nothing here

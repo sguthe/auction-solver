@@ -68,7 +68,6 @@ namespace auction
           std::pair<AC, AC> cost;
           fillCache<false, true>(c, x, y, cost, beta);
         }
-        c.printCases(true);
         if (remove_beta) beta.resize(0);
       }
     }
@@ -139,7 +138,7 @@ namespace auction
               }
             }
           }
-        }, x, limit, beta);
+        }, x, target_size, limit, beta);
 
         for (int p = 0; p < processor_count; p++)
         {
@@ -179,7 +178,7 @@ namespace auction
               limit = heap[0];
             }
           }
-        }, x, limit, beta);
+        }, x, target_size, limit, beta);
         // for a heap the max is at 0 but we need it at the end.
         std::swap(heap[0], heap[CACHE]);
         std::swap(idx[0], idx[CACHE]);

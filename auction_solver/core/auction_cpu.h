@@ -8,6 +8,7 @@
 #include <iostream>
 #include <algorithm>
 
+#if 0
 #include "auction_helper.h"
 
 #include "auction_cost_table.h"
@@ -16,8 +17,9 @@
 
 #include "auction_find_linear.h"
 #include "auction_find_caching.h"
-
+#endif
 #include "auction_one_way.h"
+
 
 #ifdef LAP_OPENMP
 #  include <omp.h>
@@ -105,7 +107,7 @@ namespace auction
         beta[y] = AC(0);
       }
     }
-    c.updateBeta(beta, target_size);
+    //c.updateBeta(beta, target_size);
 
     std::vector<std::mutex> Block(B.size());
     // loop until done
@@ -197,7 +199,7 @@ namespace auction
         for (int y = 1; y < target_size; y++) max_beta = std::max(max_beta, beta[y]);
         for (int y = 0; y < target_size; y++) beta[y] -= max_beta;
         f.fixBeta(max_beta);
-        c.updateBeta(beta, target_size);
+        //c.updateBeta(beta, target_size);
       }
     }
 #ifdef LAP_QUIET

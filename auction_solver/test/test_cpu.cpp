@@ -112,7 +112,7 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 	C eps = C(0);
 	int *rowsol = new int[N];
 	auction::DirectIterator<C, M> iterator(costMatrix);
-  auction::AdaptorCost<C, auction::DirectIterator<C, M>> adaptor(iterator, N);
+  //auction::AdaptorCost<C, auction::DirectIterator<C, M>> adaptor(iterator, N);
 
 	if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 	std::vector<int> coupling(N);
@@ -124,8 +124,9 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 	C cost(0);
 	if (caching)
 	{
-    auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N, adaptor, beta, cache_size);
-		cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+//    auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N, adaptor, beta, cache_size);
+    auction::FindCaching<auction::DirectIterator<C, M>, C> f(N, iterator, beta, cache_size);
+		cost = auction::auctionSingle<C>(coupling, iterator, f, beta, eps, [&]()
 		{
 #pragma omp parallel for
 			for (int x = 0; x < N; x++)
@@ -133,14 +134,16 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 				// slack...
 				if (coupling[x] != -1) rowsol[coupling[x]] = x;
 			}
-			C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+//      C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+      C cost = auction::getCurrentCost<C>(rowsol, iterator, N);
 			return cost;
 		}, omp);
 	}
 	else
 	{
-    auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N);
-		cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+//    auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N);
+    auction::FindLinear<auction::DirectIterator<C, M>, C> f(N);
+		cost = auction::auctionSingle<C>(coupling, iterator, f, beta, eps, [&]()
 		{
 #pragma omp parallel for
 			for (int x = 0; x < N; x++)
@@ -148,7 +151,8 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 				// slack...
 				if (coupling[x] != -1) rowsol[coupling[x]] = x;
 			}
-			C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+//      C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+      C cost = auction::getCurrentCost<C>(rowsol, iterator, N);
 			return cost;
 		}, omp);
 	}
@@ -170,7 +174,8 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 		if (passed) ss << "test passed: ";
 		else ss << "test failed: ";
 		C real_cost(0);
-		for (int i = 0; i < N; i++) real_cost += adaptor.getCost(i, i);
+//    for (int i = 0; i < N; i++) real_cost += adaptor.getCost(i, i);
+    for (int i = 0; i < N; i++) real_cost += iterator.getCost(i, i);
 		ss << "ground truth cost = " << real_cost;
 		auction::displayTime(start_time, ss.str().c_str(), std::cout);
 	}
@@ -497,7 +502,7 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 					auction::TableCost<C> costMatrix(N, costFunction);
 					auction::DirectIterator<C, decltype(costMatrix)> iterator(costMatrix);
-          auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>> adaptor(iterator, N);
+//          auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>> adaptor(iterator, N);
 
 					if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 
@@ -505,8 +510,10 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 					C cost(0);
 					if (caching)
 					{
-            auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
-						cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+//            auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
+            auction::FindCaching<auction::DirectIterator<C, auction::TableCost<C>>, C> f(N, iterator, beta, cache_size);
+//            cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+            cost = auction::auctionSingle<C>(coupling, iterator, f, beta, eps, [&]()
 						{
 #pragma omp parallel for
 							for (int x = 0; x < N; x++)
@@ -514,14 +521,17 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 								// slack...
 								if (coupling[x] != -1) rowsol[coupling[x]] = x;
 							}
-							C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+//              C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+              C cost = auction::getCurrentCost<C>(rowsol, iterator, N);
 							return cost;
 						}, omp);
 					}
 					else
 					{
-            auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N);
-						cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+//            auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N);
+            auction::FindLinear<auction::DirectIterator<C, auction::TableCost<C>>, C> f(N);
+//            cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
+            cost = auction::auctionSingle<C>(coupling, iterator, f, beta, eps, [&]()
 						{
 #pragma omp parallel for
 							for (int x = 0; x < N; x++)
@@ -529,7 +539,8 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 								// slack...
 								if (coupling[x] != -1) rowsol[coupling[x]] = x;
 							}
-							C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+//              C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
+              C cost = auction::getCurrentCost<C>(rowsol, iterator, N);
 							return cost;
 						}, omp);
 					}

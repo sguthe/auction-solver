@@ -78,9 +78,6 @@ namespace auction
 }
 
 #include "core/auction_cost.h"
-#include "core/auction_cost_adapter.h"
-#include "core/auction_cost_direct.h"
-#include "core/auction_cost_table.h"
 #include "core/auction_cpu.h"
 #include "core/auction_direct_iterator.h"
 #include "core/auction_find_caching.h"

@@ -56,6 +56,7 @@ namespace auction
     __forceinline const TC *getRow(int x) const { return &(c[(long long)x * (long long)y_size]); }
     __forceinline const TC getCost(int x, int y) const { return getRow(x)[y]; }
     __forceinline void setRow(int x, TC *v) { memcpy(&(c[(long long)x * (long long)y_size]), v, y_size * sizeof(TC)); }
+    __forceinline void setCost(int x, int y, TC v) { c[(long long)x * (long long)y_size + (long long)y] = v; }
   };
 }
 
