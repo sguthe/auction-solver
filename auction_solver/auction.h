@@ -32,23 +32,17 @@
 namespace auction
 {
   // Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-  template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-  template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
+  template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon = true, bool find_caching = true);
+  template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon = true, bool find_caching = true);
   template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
   template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
 
   // Cost functions, including tabulated costs
   template <class TC, typename GETCOST> class SimpleCostFunction;
-  template <class TC, typename GETCOSTROW> class RowCostFunction;
   template <class TC> class TableCost;
 
   // Iterator classes used for accessing the cost functions
   template <class TC, class CF> class DirectIterator;
-  template <class TC, class CF, class CACHE> class CachingIterator;
-
-  // Caching Schemes to be used for caching iterator
-  class CacheSLRU;
-  class CacheLFU;
 
   // Memory management
   template <typename T> void alloc(T * &ptr, unsigned long long width, const char *file, const int line);
@@ -58,19 +52,17 @@ namespace auction
   namespace omp
   {
     // Functions used for solving the lap, calculating the costs of a certain assignment and guessing the initial epsilon value.
-    template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
-    template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon);
+    template <class SC, class CF, class I> void solve(int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon = true, bool find_caching = true);
+    template <class SC, class CF, class I> void solve(int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon = true, bool find_caching = true);
     template <class SC, class CF> SC cost(int dim, CF &costfunc, int *rowsol);
     template <class SC, class CF> SC cost(int dim, int dim2, CF &costfunc, int *rowsol);
 
     // Cost functions, including tabulated costs
     template <class TC, typename GETCOST> class SimpleCostFunction;
-    template <class TC, typename GETENABLED, typename GETCOSTROW> class RowCostFunction;
     template <class TC> class TableCost;
 
     // Iterator classes used for accessing the cost functions
     template <class TC, class CF> class DirectIterator;
-    template <class TC, class CF, class CACHE> class CachingIterator;
 
   }
 #endif
@@ -78,7 +70,6 @@ namespace auction
 }
 
 #include "core/auction_cost.h"
-#include "core/auction_cpu.h"
 #include "core/auction_direct_iterator.h"
 #include "core/auction_find_caching.h"
 #include "core/auction_find_linear.h"
@@ -86,3 +77,10 @@ namespace auction
 #include "core/auction_helper.h"
 #include "core/auction_one_way.h"
 #include "core/auction_solver.h"
+#ifdef LAP_OPENMP
+#include "core/omp/auction_direct_iterator.h"
+#include "core/omp/auction_find_caching.h"
+#include "core/omp/auction_find_linear.h"
+#include "core/omp/auction_one_way.h"
+#include "core/omp/auction_solver.h"
+#endif

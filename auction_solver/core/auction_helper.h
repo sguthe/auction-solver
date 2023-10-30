@@ -20,18 +20,6 @@
 
 namespace auction
 {
-#ifdef DISPLAY_MISS
-  extern long long hit_count;
-  extern long long miss_count;
-
-  extern long long total_hit_count;
-  extern long long total_miss_count;
-#endif
-
-#ifdef DISPLAY_THREAD_FILL
-  extern std::vector<long long> thread_fill_count;
-#endif
-
   int src_idx(int x, int source_size, int target_size)
   {
     if (source_size == target_size) return x;
