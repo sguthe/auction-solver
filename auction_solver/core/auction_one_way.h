@@ -7,12 +7,12 @@
 
 namespace auction
 {
-  template <class AC>
+  template <class SC>
   class AuctionOneWay
   {
   private:
     std::vector<int> m_y;
-    std::vector<AC> m_cost;
+    std::vector<SC> m_cost;
     int m_real_pending;
   private:
     void enqueue(int v, int &c, std::vector<int> &l)
@@ -26,13 +26,13 @@ namespace auction
     }
 
     void auctionBidding(
-      int x, int y, std::pair<AC, AC> cost,
+      int x, int y, std::pair<SC, SC> cost,
       std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned,
       int &r_count, std::vector<int> &receiving,
-      std::vector<std::pair<int, AC>> &B)
+      std::vector<std::pair<int, SC>> &B)
     {
-      AC ccost = cost.first - cost.second;
-      AC first_cost = B[y].second;
+      SC ccost = cost.first - cost.second;
+      SC first_cost = B[y].second;
       int first_index = B[y].first;
       int queue_index = -1;
       if (y == -1)
@@ -58,10 +58,10 @@ namespace auction
 
     template <bool EXACT>
     void auctionBuying(
-      std::vector<int> &coupling, std::vector<AC> &beta,
+      std::vector<int> &coupling, std::vector<SC> &beta,
       std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned,
       int &r_count, std::vector<int> &receiving,
-      std::vector<std::pair<int, AC>> &B, AC epsilon)
+      std::vector<std::pair<int, SC>> &B, SC epsilon)
     {
       const int rc = r_count;
       bool updated;
@@ -77,7 +77,7 @@ namespace auction
             queue_index = coupling[y];
             coupling[y] = -1;
           }
-          AC cost = B[y].second;
+          SC cost = B[y].second;
           int x = B[y].first;
 
           if (EXACT) beta[y] += cost;
@@ -135,15 +135,15 @@ namespace auction
 
     template <bool EXACT, class I, class FIND>
     int auction(
-      std::vector<int> &coupling, std::vector<AC> &beta,
+      std::vector<int> &coupling, std::vector<SC> &beta,
       I &iterator, FIND &f,
       std::vector<int> &u_count, std::vector<std::vector<int>> &unassigned,
 #ifdef DEFER_MISS
       int &d_count, std::vector<int> &deferred,
 #endif
       int &r_count, std::vector<int> &receiving,
-      std::vector<std::pair<int, AC>> &B,
-      int target_size, AC epsilon)
+      std::vector<std::pair<int, SC>> &B,
+      int target_size, SC epsilon)
     {
       std::swap(unassigned[0], unassigned[1]);
       u_count[1] = u_count[0];
@@ -158,7 +158,7 @@ namespace auction
       {
         int x = unassigned[1][xi];
         std::pair<int, int> y;
-        std::pair<AC, AC> cost;
+        std::pair<SC, SC> cost;
           
 #ifdef DEFER_MISS
         if (f.template findBid(iterator, x, y, cost, beta))
@@ -188,7 +188,7 @@ namespace auction
         {
           int x = deferred[xi];
           std::pair<int, int> y(-1, -1);
-          std::pair<AC, AC> cost;
+          std::pair<SC, SC> cost;
           f.template fillCache<false>(iterator, x, y, cost, beta);
           auctionBidding(x, y.first, cost, u_count, unassigned, r_count, receiving, B);
         }

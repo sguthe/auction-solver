@@ -14,19 +14,19 @@ namespace auction
 {
   namespace omp
   {
-    template <class I, class AC>
+    template <class I, class SC>
     class FindCaching
     {
     protected:
       int target_size;
       int CACHE;
       std::vector<std::vector<int>> m_idx;
-      std::vector<std::vector<AC>> m_heap;
+      std::vector<std::vector<SC>> m_heap;
 
       std::vector<std::vector<int>> temp_idx;
-      std::vector<std::vector<AC>> temp_heap;
+      std::vector<std::vector<SC>> temp_heap;
     public:
-      FindCaching(int target_size, I &iterator, std::vector<AC> &beta, int CACHE, bool fill = true) : target_size(target_size), CACHE(CACHE)
+      FindCaching(int target_size, I &iterator, std::vector<SC> &beta, int CACHE, bool fill = true) : target_size(target_size), CACHE(CACHE)
       {
 #ifdef DISPLAY_THREAD_FILL
         thread_fill_count.resize(omp_get_max_threads());
@@ -52,14 +52,14 @@ namespace auction
           if (beta.size() < (size_t)target_size)
           {
             beta.resize(target_size);
-            for (int x = 0; x < target_size; x++) beta[x] = AC(0.0);
+            for (int x = 0; x < target_size; x++) beta[x] = SC(0.0);
             remove_beta = true;
           }
 #pragma omp parallel for schedule(dynamic)
           for (int x = 0; x < target_size; x++)
           {
             std::pair<int, int> y;
-            std::pair<AC, AC> cost;
+            std::pair<SC, SC> cost;
             fillCache<false, true>(iterator, x, y, cost, beta);
           }
           if (remove_beta) beta.resize(0);
@@ -73,7 +73,7 @@ namespace auction
         {
           float mod = iterator.update_target(linear_target, x);
           std::vector<int> &idx = m_idx[x];
-          std::vector<AC> &heap = m_heap[x];
+          std::vector<SC> &heap = m_heap[x];
           for (int yy = 0; yy < CACHE; yy++)
           {
             int y = idx[yy];
@@ -88,21 +88,21 @@ namespace auction
 
       // this doesn't have to be the same class
       template <bool PAR, bool FILL_ONLY>
-      void fillCache(I &iterator, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
+      void fillCache(I &iterator, int x, std::pair<int, int> &y, std::pair<SC, SC> &cost, std::vector<SC> &beta)
       {
         std::vector<int> &idx = m_idx[x];
-        std::vector<AC> &heap = m_heap[x];
+        std::vector<SC> &heap = m_heap[x];
 
 #ifdef DISPLAY_THREAD_FILL
         thread_fill_count[omp_get_thread_num()]++;
 #endif
 
-        AC limit = MAX_COST;
+        SC limit = MAX_COST;
         int N = 0;
         if (PAR)
         {
           std::vector<int> NN(omp_get_max_threads());
-          iterator.template iterate<PAR>([&](int yy, AC ccost)
+          iterator.template iterate<PAR>([&](int yy, SC ccost)
           {
             if (ccost <= limit)
             {
@@ -147,7 +147,7 @@ namespace auction
         }
         else
         {
-          iterator.template iterate<PAR>([&](int yy, AC ccost)
+          iterator.template iterate<PAR>([&](int yy, SC ccost)
           {
             if (ccost < limit)
             {
@@ -196,7 +196,7 @@ namespace auction
           {
             int yy = idx[yi];
             heap[yi] = iterator.getCost(x, yy);
-            AC ccost = heap[yi] - beta[yy];
+            SC ccost = heap[yi] - beta[yy];
             if ((ccost < cost.first) || ((ccost == cost.first) && (yy < y.first)))
             {
               y.second = y.first;
@@ -214,19 +214,19 @@ namespace auction
       }
 
       template <bool PAR>
-      bool findBid(I &iterator, int x, std::pair<int, int> &y, std::pair<AC, AC> &cost, std::vector<AC> &beta)
+      bool findBid(I &iterator, int x, std::pair<int, int> &y, std::pair<SC, SC> &cost, std::vector<SC> &beta)
       {
         y.first = y.second = -1;
         cost.first = cost.second = MAX_COST;
         // cached
         std::vector<int> &idx = m_idx[x];
-        std::vector<AC> &heap = m_heap[x];
+        std::vector<SC> &heap = m_heap[x];
 
         // TODO: doing this in parallel requires reduction by hand...
         for (int yi = 0; yi < CACHE; yi++)
         {
           int yy = idx[yi];
-          AC ccost = heap[yi] - beta[yy];
+          SC ccost = heap[yi] - beta[yy];
           if ((ccost < cost.first) || ((ccost == cost.first) && (yy < y.first)))
           {
             y.second = y.first;
@@ -272,7 +272,7 @@ namespace auction
 #endif
       }
 
-      void fixBeta(AC dlt)
+      void fixBeta(SC dlt)
       {
 #pragma omp parallel for
         for (int x = 0; x < target_size; x++)

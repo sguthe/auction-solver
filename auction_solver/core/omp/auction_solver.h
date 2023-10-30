@@ -173,7 +173,7 @@ namespace auction
             {
               if (coupling[x] != -1) rowsol[coupling[x]] = x;
             }
-            AC ccost = this.cost(dim, dim2, costfunc, rowsol);
+            SC ccost = this.cost(dim, dim2, costfunc, rowsol);
             std::stringstream ss;
             ss << " epsilon = " << epsilon;
             if (ccost > SC(0)) ss << " cost = " << ccost;
