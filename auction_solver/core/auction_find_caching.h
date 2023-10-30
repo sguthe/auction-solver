@@ -102,10 +102,9 @@ namespace auction
 
       if (FILL_ONLY)
       {
-        const SC *row = iterator.getRow(x);
         for (int yi = 0; yi < CACHE; yi++)
         {
-          heap[yi] = row[idx[yi]];
+          heap[yi] = iterator.getCost(x, idx[yi]);
         }
       }
       else
@@ -114,11 +113,10 @@ namespace auction
         y.first = -1;
         y.second = -1;
         cost.first = cost.second = MAX_COST;
-        const SC *row = iterator.getRow(x);
         for (int yi = 0; yi < CACHE; yi++)
         {
           int yy = idx[yi];
-          heap[yi] = row[yy];
+          heap[yi] = iterator.getCost(x,yy);
           SC ccost = heap[yi] - beta[yy];
           if ((ccost < cost.first) || ((ccost == cost.first) && (yy < y.first)))
           {

@@ -19,6 +19,7 @@ namespace auction
       void getHitMiss(long long &hit, long long &miss) { hit = miss = 0; }
 
       __forceinline const TC *getRow(int i) { return costfunc.getRow(i); }
+      // required for individual lookups
       __forceinline const TC getCost(int i, int j) { return costfunc.getCost(i, j); }
 
       template <bool PAR, class C>
