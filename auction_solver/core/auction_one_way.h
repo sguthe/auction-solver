@@ -161,7 +161,7 @@ namespace auction
         std::pair<SC, SC> cost;
           
 #ifdef DEFER_MISS
-        if (f.template findBid(iterator, x, y, cost, beta))
+        if (f.findBid(iterator, x, y, cost, beta))
         {
           auctionBidding(x, y.first, cost, u_count, unassigned, r_count, receiving, B);
         }
@@ -170,7 +170,7 @@ namespace auction
           enqueue(x, d_count, deferred);
         }
 #else
-        f.template findBid(iterator, x, y, cost, beta);
+        f.findBid(iterator, x, y, cost, beta);
         auctionBidding(x, y, cost, u_count, unassigned, r_count, receiving, B);
 #endif
       }
