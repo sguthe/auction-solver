@@ -93,11 +93,45 @@ following:
 
 ## High-Level Interface
 
-Since this code was initially used for testing purposes oinly, there
+Since this code was initially used for testing purposes only, there
 is currently no high-level interface implemented.
 
 ## Low-Level Interface
 
-Since this code was initially used for testing purposes oinly, there
-is currently no description here, yet.
+The low-level interface can be found in the `auction.h` include files. The
+single threaded CPU code consists of the following functions for solving
+the linear assignment and calculating the final costs:
 
+    namespace lap
+    {
+      template <class SC, class CF, class I> void solve(
+        int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon = true, bool find_caching = true);
+      template <class SC, class CF, class I> void solve(
+        int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, 
+        bool use_epsilon = true, bool find_caching = true);
+      template <class SC, class CF> SC cost(
+        int dim, CF &costfunc, int *rowsol);
+      template <class SC, class CF> SC cost(
+        int dim, int dim2, CF &costfunc, int *rowsol);
+    }
+
+The multi threaded CPU code uses the following interface:
+
+    namespace lap
+    {
+      namespace omp
+      {
+        template <class SC, class CF, class I> void solve(
+          int dim, CF &costfunc, I &iterator, int *rowsol, bool use_epsilon = true, bool find_caching = true);
+        template <class SC, class CF, class I> void solve(
+          int dim, int dim2, CF &costfunc, I &iterator, int *rowsol, 
+          bool use_epsilon = true, bool find_caching = true);
+        template <class SC, class CF> SC cost(
+          int dim, CF &costfunc, int *rowsol);
+        template <class SC, class CF> SC cost(
+          int dim, int dim2, CF &costfunc, int *rowsol);
+      }
+    }
+
+Please refer to the same file for additional helper classes that can be
+used for the low-level interface.

@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
 
 	if (opt.use_omp)
 	{
+#ifdef LAP_OPENMP
 		// omp "warmup"
 		int *tmp = new int[1024];
 #pragma omp parallel for
@@ -37,6 +38,7 @@ int main(int argc, char* argv[])
 			tmp[i] = -1;
 		}
 		delete[] tmp;
+#endif
 	}
 
 	if (opt.use_double)
@@ -85,75 +87,33 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-template <class TC, class I>
-TC guessEpsilon(int x_size, int y_size, I& iterator, int step = 1)
-{
-	TC epsilon(0);
-	for (int x = 0; x < x_size; x += step)
-	{
-		const TC *tt = iterator.getRow(x);
-		TC min_cost, max_cost;
-		min_cost = max_cost = tt[0];
-		for (int y = 1; y < y_size; y++)
-		{
-			TC cost_l = tt[y];
-			min_cost = std::min(min_cost, cost_l);
-			max_cost = std::max(max_cost, cost_l);
-		}
-		epsilon += max_cost - min_cost;
-	}
-	return (epsilon / TC(10 * (x_size + step - 1) / step));
-}
-
-
 template <class C, class M, class TP>
 void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &start_time, bool sanity = false)
 {
-	C eps = C(0);
 	int *rowsol = new int[N];
-	auction::DirectIterator<C, M> iterator(costMatrix);
-  auction::AdaptorCost<C, auction::DirectIterator<C, M>> adaptor(iterator, N);
 
-	if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
 	std::vector<int> coupling(N);
 	std::vector<C> beta;
-	int cache_size = 3;// (int)ceil(sqrt((double)N / 10.0));
 
 	auction::displayTime(start_time, "setup complete", std::cout);
 
-	C cost(0);
-	if (caching)
-	{
-    auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N, adaptor, beta, cache_size);
-		cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
-		{
-#pragma omp parallel for
-			for (int x = 0; x < N; x++)
-			{
-				// slack...
-				if (coupling[x] != -1) rowsol[coupling[x]] = x;
-			}
-			C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
-			return cost;
-		}, omp);
-	}
-	else
-	{
-    auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, M>>, C> f(N);
-		cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
-		{
-#pragma omp parallel for
-			for (int x = 0; x < N; x++)
-			{
-				// slack...
-				if (coupling[x] != -1) rowsol[coupling[x]] = x;
-			}
-			C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
-			return cost;
-		}, omp);
-	}
+  C cost(0);
+  if (omp)
+  {
+#ifdef LAP_OPENMP
+    auction::omp::DirectIterator<C, M> iterator(costMatrix);
+    auction::omp::solve<C>(N, costMatrix, iterator, rowsol, epsilon, caching);
+    cost = auction::omp::cost<C>(N, costMatrix, rowsol);
+#endif
+  }
+  else
+  {
+    auction::DirectIterator<C, M> iterator(costMatrix);
+    auction::solve<C>(N, costMatrix, iterator, rowsol, epsilon, caching);
+    cost = auction::cost<C>(N, costMatrix, rowsol);
+  }
 
-	{
+  {
 		std::stringstream ss;
 		ss << "cost = " << cost;
 		auction::displayTime(start_time, ss.str().c_str(), std::cout);
@@ -170,7 +130,7 @@ void testMatrix(int N, M &costMatrix, bool omp, bool caching, bool epsilon, TP &
 		if (passed) ss << "test passed: ";
 		else ss << "test failed: ";
 		C real_cost(0);
-		for (int i = 0; i < N; i++) real_cost += adaptor.getCost(i, i);
+    for (int i = 0; i < N; i++) real_cost += costMatrix.getCost(i, i);
 		ss << "ground truth cost = " << real_cost;
 		auction::displayTime(start_time, ss.str().c_str(), std::cout);
 	}
@@ -480,69 +440,35 @@ template <class C> void testImages(std::vector<std::string> &images, long long m
 
 				int *rowsol = new int[N2];
 
-				long long entries = (max_tab * max_tab) / N2;
-
-				C eps = C(0);
-				int N = std::max(N1, N2);
-
-				std::vector<int> coupling(N);
-				std::vector<C> beta;
-				int cache_size = 3;// (int)ceil(sqrt((double)entries / 10.0));
-
 				auction::SimpleCostFunction<C, decltype(get_cost)> costFunction(get_cost);
 
-				if (N1 <= entries)
-				{
-					std::cout << "using table with " << N1 << " rows." << std::endl;
+        std::cout << "using table with " << N1 << " rows." << std::endl;
 
-					auction::TableCost<C> costMatrix(N, costFunction);
-					auction::DirectIterator<C, decltype(costMatrix)> iterator(costMatrix);
-          auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>> adaptor(iterator, N);
+        auction::TableCost<C> costMatrix(N1, N2, costFunction);
+ 
+        auction::displayTime(start_time, "setup complete", std::cout);
 
-					if (epsilon) eps = guessEpsilon<C>(N, N, iterator);
+        C cost(0);
+        if (omp)
+        {
+#ifdef LAP_OPENMP
+          auction::omp::DirectIterator<C, decltype(costMatrix)> iterator(costMatrix);
+          auction::omp::solve<C>(N1, N2, costMatrix, iterator, rowsol, epsilon, caching);
+          cost = auction::omp::cost<C>(N1, N2, costMatrix, rowsol);
+#endif
+        }
+        else
+        {
+          auction::DirectIterator<C, decltype(costMatrix)> iterator(costMatrix);
+          auction::solve<C>(N1, N2, costMatrix, iterator, rowsol, epsilon, caching);
+          cost = auction::cost<C>(N1, N2, costMatrix, rowsol);
+        }
 
-					auction::displayTime(start_time, "setup complete", std::cout);
-					C cost(0);
-					if (caching)
-					{
-            auction::FindCaching<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N, adaptor, beta, cache_size);
-						cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
-						{
-#pragma omp parallel for
-							for (int x = 0; x < N; x++)
-							{
-								// slack...
-								if (coupling[x] != -1) rowsol[coupling[x]] = x;
-							}
-							C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
-							return cost;
-						}, omp);
-					}
-					else
-					{
-            auction::FindLinear<auction::AdaptorCost<C, auction::DirectIterator<C, auction::TableCost<C>>>, C> f(N);
-						cost = auction::auctionSingle<C>(coupling, adaptor, f, beta, eps, [&]()
-						{
-#pragma omp parallel for
-							for (int x = 0; x < N; x++)
-							{
-								// slack...
-								if (coupling[x] != -1) rowsol[coupling[x]] = x;
-							}
-							C cost = auction::getCurrentCost<C>(rowsol, adaptor, N);
-							return cost;
-						}, omp);
-					}
-
-					{
-						std::stringstream ss;
-						ss << "cost = " << cost;
-						auction::displayTime(start_time, ss.str().c_str(), std::cout);
-					}
-				}
-				else
-				{
-				}
+        {
+          std::stringstream ss;
+          ss << "cost = " << cost;
+          auction::displayTime(start_time, ss.str().c_str(), std::cout);
+        }
 			}
 		}
 	}
