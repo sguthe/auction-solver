@@ -20,7 +20,7 @@ endif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_GENERATOR_PLATFORM x64)
-  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Wall;/O2>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Wall;/O2;/openmp:llvm>")
 endif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 
 # Define where your executables should be put
