@@ -81,7 +81,7 @@ namespace auction
 
       SC limit = MAX_COST;
       int N = 0;
-      iterator.template iterate([&](int yy, SC ccost)
+      iterator.iterate([&](int yy, SC ccost)
       {
         if (ccost < limit)
         {

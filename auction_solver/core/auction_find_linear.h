@@ -20,7 +20,7 @@ namespace auction
       y.first = y.second = -1;
       cost.first = cost.second = MAX_COST;
       // y.1 = argmin(...) and y.2 = min(...) with y.2 in Y\y.1
-      iterator.template iterate([&](int yy, SC ccost)
+      iterator.iterate([&](int yy, SC ccost)
       {
         if ((ccost < cost.first) || ((ccost == cost.first) && (yy < y.first)))
         {
